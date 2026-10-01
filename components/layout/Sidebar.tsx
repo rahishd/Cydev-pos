@@ -12,7 +12,7 @@ const navItems = [
   { label: "Customers", href: "/customers", enabled: true },
   { label: "Expenses", href: "/expenses", enabled: true },
   { label: "Reports", href: "#", enabled: false },
-  { label: "Users", href: "#", enabled: false },
+  { label: "Users", href: "/users", enabled: true },
   { label: "Audit Log", href: "#", enabled: false },
   { label: "Settings", href: "#", enabled: false },
 ];
