@@ -1,6 +1,3 @@
-// Bag & Shoes Inventory Management System — data model
-// See AGENTS.md for the FRD section this model was derived from.
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,38 +7,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ---------- Users & Auth ----------
-
-enum Role {
-  OWNER
-  STAFF
-}
-
-enum UserStatus {
-  ACTIVE
-  DISABLED
-}
-
 model User {
-  id           String     @id @default(cuid())
-  name         String
-  email        String     @unique
-  passwordHash String
-  role         Role       @default(STAFF)
-  status       UserStatus @default(ACTIVE)
-  lastLoginAt  DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-
+  id             String          @id @default(cuid())
+  name           String
+  email          String          @unique
+  passwordHash   String
+  role           Role            @default(STAFF)
+  status         UserStatus      @default(ACTIVE)
+  lastLoginAt    DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   auditLogs      AuditLog[]
-  stockMovements StockMovement[]
+  expenses       Expense[]
   purchases      Purchase[]
   sales          Sale[]
-  expenses       Expense[]
   stockCounts    StockCount[]
+  stockMovements StockMovement[]
 }
-
-// ---------- Catalog ----------
 
 model Category {
   id        String    @id @default(cuid())
@@ -57,272 +39,215 @@ model Brand {
   products  Product[]
 }
 
-enum ProductStatus {
-  ACTIVE
-  INACTIVE
-}
-
 model Product {
-  id             String        @id @default(cuid())
-  name           String
-  sku            String        @unique
-  categoryId     String?
-  category       Category?     @relation(fields: [categoryId], references: [id])
-  brandId        String?
-  brand          Brand?        @relation(fields: [brandId], references: [id])
-  description    String?
-  imageUrl       String?
-  supplierId     String?
-  supplier       Supplier?     @relation(fields: [supplierId], references: [id])
-  purchasePrice  Decimal       @db.Decimal(12, 2)
-  sellingPrice   Decimal       @db.Decimal(12, 2)
-  discountPrice  Decimal?      @db.Decimal(12, 2)
-  minStockLevel  Int           @default(0)
-  status         ProductStatus @default(ACTIVE)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  variants ProductVariant[]
+  id            String           @id @default(cuid())
+  name          String
+  sku           String           @unique
+  categoryId    String?
+  brandId       String?
+  description   String?
+  imageUrl      String?
+  supplierId    String?
+  purchasePrice Decimal          @db.Decimal(12, 2)
+  sellingPrice  Decimal          @db.Decimal(12, 2)
+  discountPrice Decimal?         @db.Decimal(12, 2)
+  minStockLevel Int              @default(0)
+  status        ProductStatus    @default(ACTIVE)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  brand         Brand?           @relation(fields: [brandId], references: [id])
+  category      Category?        @relation(fields: [categoryId], references: [id])
+  supplier      Supplier?        @relation(fields: [supplierId], references: [id])
+  variants      ProductVariant[]
 }
 
 model ProductVariant {
-  id            String        @id @default(cuid())
-  productId     String
-  product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sku           String        @unique
-  size          String?
-  color         String?
-  material      String?
-  barcode       String?       @unique // future barcode readiness (FRD §24), unused in v1
-  purchasePrice Decimal       @db.Decimal(12, 2)
-  sellingPrice  Decimal       @db.Decimal(12, 2)
-  quantity      Int           @default(0)
-  minStockLevel Int           @default(0)
-  status        ProductStatus @default(ACTIVE)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  stockMovements   StockMovement[]
-  purchaseItems    PurchaseItem[]
-  saleItems        SaleItem[]
-  stockCountItems  StockCountItem[]
+  id              String           @id @default(cuid())
+  productId       String
+  sku             String           @unique
+  size            String?
+  color           String?
+  material        String?
+  barcode         String?          @unique
+  purchasePrice   Decimal          @db.Decimal(12, 2)
+  sellingPrice    Decimal          @db.Decimal(12, 2)
+  quantity        Int              @default(0)
+  minStockLevel   Int              @default(0)
+  status          ProductStatus    @default(ACTIVE)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  product         Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  purchaseItems   PurchaseItem[]
+  saleItems       SaleItem[]
+  stockCountItems StockCountItem[]
+  stockMovements  StockMovement[]
 }
-
-// ---------- Suppliers & Purchases ----------
 
 model Supplier {
-  id             String   @id @default(cuid())
-  name           String
-  phone          String?
-  email          String?
-  address        String?
-  panVat         String?
-  bankDetails    String?
-  paymentTerms   String?
-  notes          String?
-  status         ProductStatus @default(ACTIVE)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  products  Product[]
-  purchases Purchase[]
-}
-
-enum PurchaseStatus {
-  DRAFT
-  ORDERED
-  PARTIALLY_RECEIVED
-  RECEIVED
-  CANCELLED
+  id           String        @id @default(cuid())
+  name         String
+  phone        String?
+  email        String?
+  address      String?
+  panVat       String?
+  bankDetails  String?
+  paymentTerms String?
+  notes        String?
+  status       ProductStatus @default(ACTIVE)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  products     Product[]
+  purchases    Purchase[]
 }
 
 model Purchase {
-  id            String         @id @default(cuid())
-  purchaseNo    String         @unique
-  supplierId    String
-  supplier      Supplier       @relation(fields: [supplierId], references: [id])
-  date          DateTime       @default(now())
-  status        PurchaseStatus @default(DRAFT)
-  discount      Decimal        @default(0) @db.Decimal(12, 2)
-  otherCosts    Decimal        @default(0) @db.Decimal(12, 2)
-  total         Decimal        @default(0) @db.Decimal(12, 2)
-  paidAmount    Decimal        @default(0) @db.Decimal(12, 2)
-  createdById   String
-  createdBy     User           @relation(fields: [createdById], references: [id])
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-
-  items PurchaseItem[]
+  id          String         @id @default(cuid())
+  purchaseNo  String         @unique
+  supplierId  String
+  date        DateTime       @default(now())
+  status      PurchaseStatus @default(DRAFT)
+  discount    Decimal        @default(0) @db.Decimal(12, 2)
+  otherCosts  Decimal        @default(0) @db.Decimal(12, 2)
+  total       Decimal        @default(0) @db.Decimal(12, 2)
+  paidAmount  Decimal        @default(0) @db.Decimal(12, 2)
+  createdById String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  createdBy   User           @relation(fields: [createdById], references: [id])
+  supplier    Supplier       @relation(fields: [supplierId], references: [id])
+  items       PurchaseItem[]
 }
 
 model PurchaseItem {
-  id                String         @id @default(cuid())
-  purchaseId        String
-  purchase          Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  productVariantId  String
-  productVariant    ProductVariant @relation(fields: [productVariantId], references: [id])
-  quantityOrdered   Int
-  quantityReceived  Int            @default(0)
-  purchasePrice     Decimal        @db.Decimal(12, 2)
-}
-
-// ---------- Inventory / Stock Movements ----------
-
-enum StockMovementType {
-  OPENING_STOCK
-  PURCHASE
-  SALE
-  CUSTOMER_RETURN
-  SUPPLIER_RETURN
-  DAMAGE
-  LOSS
-  ADJUSTMENT
+  id               String         @id @default(cuid())
+  purchaseId       String
+  productVariantId String
+  quantityOrdered  Int
+  quantityReceived Int            @default(0)
+  purchasePrice    Decimal        @db.Decimal(12, 2)
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  purchase         Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
 }
 
 model StockMovement {
   id               String            @id @default(cuid())
   productVariantId String
-  productVariant   ProductVariant    @relation(fields: [productVariantId], references: [id])
   type             StockMovementType
-  quantityChange   Int // positive = stock in, negative = stock out
+  quantityChange   Int
   reason           String?
-  referenceId      String? // e.g. related Purchase, Sale, StockCount id
+  referenceId      String?
   createdById      String
-  createdBy        User              @relation(fields: [createdById], references: [id])
   createdAt        DateTime          @default(now())
+  createdBy        User              @relation(fields: [createdById], references: [id])
+  productVariant   ProductVariant    @relation(fields: [productVariantId], references: [id])
 }
 
 model StockCount {
-  id          String           @id @default(cuid())
-  date        DateTime         @default(now())
-  notes       String?
+  id            String           @id @default(cuid())
+  date          DateTime         @default(now())
+  notes         String?
   performedById String
-  performedBy User             @relation(fields: [performedById], references: [id])
-  createdAt   DateTime         @default(now())
-
-  items StockCountItem[]
+  createdAt     DateTime         @default(now())
+  performedBy   User             @relation(fields: [performedById], references: [id])
+  items         StockCountItem[]
 }
 
 model StockCountItem {
   id               String         @id @default(cuid())
   stockCountId     String
-  stockCount       StockCount     @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
   productVariantId String
-  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
   systemQuantity   Int
   physicalQuantity Int
   difference       Int
   reason           String?
-}
-
-// ---------- Sales / POS ----------
-
-enum PaymentMethod {
-  CASH
-  ESEWA
-  KHALTI
-  FONEPAY
-  BANK_TRANSFER
-  CARD
-  CREDIT
-  OTHER
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  stockCount       StockCount     @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
 }
 
 model Customer {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   name      String
   phone     String?
   email     String?
   address   String?
   notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  sales   Sale[]
-  credits CustomerCredit[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  credits   CustomerCredit[]
+  sales     Sale[]
 }
 
 model Sale {
-  id            String        @id @default(cuid())
-  invoiceNo     String        @unique
-  customerId    String?
-  customer      Customer?     @relation(fields: [customerId], references: [id])
-  staffId       String
-  staff         User          @relation(fields: [staffId], references: [id])
-  subtotal      Decimal       @db.Decimal(12, 2)
-  discount      Decimal       @default(0) @db.Decimal(12, 2)
-  tax           Decimal       @default(0) @db.Decimal(12, 2)
-  total         Decimal       @db.Decimal(12, 2)
-  amountPaid    Decimal       @default(0) @db.Decimal(12, 2)
-  createdAt     DateTime      @default(now())
-
-  items       SaleItem[]
-  payments    Payment[]
-  invoice     Invoice?
-  returns     SaleReturn[]
+  id         String       @id @default(cuid())
+  invoiceNo  String       @unique
+  customerId String?
+  staffId    String
+  subtotal   Decimal      @db.Decimal(12, 2)
+  discount   Decimal      @default(0) @db.Decimal(12, 2)
+  tax        Decimal      @default(0) @db.Decimal(12, 2)
+  total      Decimal      @db.Decimal(12, 2)
+  amountPaid Decimal      @default(0) @db.Decimal(12, 2)
+  createdAt  DateTime     @default(now())
+  invoice    Invoice?
+  payments   Payment[]
+  customer   Customer?    @relation(fields: [customerId], references: [id])
+  staff      User         @relation(fields: [staffId], references: [id])
+  items      SaleItem[]
+  returns    SaleReturn[]
 }
 
 model SaleItem {
   id               String         @id @default(cuid())
   saleId           String
-  sale             Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
   productVariantId String
-  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
   quantity         Int
   unitPrice        Decimal        @db.Decimal(12, 2)
   discount         Decimal        @default(0) @db.Decimal(12, 2)
   total            Decimal        @db.Decimal(12, 2)
-  unitCost         Decimal        @db.Decimal(12, 2) // snapshot of purchase cost, for profit calc (FRD §15)
+  unitCost         Decimal        @db.Decimal(12, 2)
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  sale             Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
 }
 
 model Payment {
   id        String        @id @default(cuid())
   saleId    String
-  sale      Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
   method    PaymentMethod
   amount    Decimal       @db.Decimal(12, 2)
   createdAt DateTime      @default(now())
+  sale      Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
 }
 
 model Invoice {
-  id         String   @id @default(cuid())
-  saleId     String   @unique
-  sale       Sale     @relation(fields: [saleId], references: [id])
-  invoiceNo  String   @unique
-  issuedAt   DateTime @default(now())
-}
-
-enum ReturnType {
-  RETURN
-  EXCHANGE
+  id        String   @id @default(cuid())
+  saleId    String   @unique
+  invoiceNo String   @unique
+  issuedAt  DateTime @default(now())
+  sale      Sale     @relation(fields: [saleId], references: [id])
 }
 
 model SaleReturn {
-  id               String     @id @default(cuid())
-  saleId           String
-  sale             Sale       @relation(fields: [saleId], references: [id])
-  type             ReturnType
-  quantity         Int
-  reason           String?
-  refundAmount     Decimal    @default(0) @db.Decimal(12, 2)
-  storeCredit      Boolean    @default(false)
-  createdAt        DateTime   @default(now())
+  id           String     @id @default(cuid())
+  saleId       String
+  type         ReturnType
+  quantity     Int
+  reason       String?
+  refundAmount Decimal    @default(0) @db.Decimal(12, 2)
+  storeCredit  Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  sale         Sale       @relation(fields: [saleId], references: [id])
 }
-
-// ---------- Customer Credit ----------
 
 model CustomerCredit {
-  id               String    @id @default(cuid())
-  customerId       String
-  customer         Customer  @relation(fields: [customerId], references: [id])
-  invoiceRef       String?
-  amount           Decimal   @db.Decimal(12, 2)
-  amountPaid       Decimal   @default(0) @db.Decimal(12, 2)
-  dueDate          DateTime?
-  createdAt        DateTime  @default(now())
+  id         String    @id @default(cuid())
+  customerId String
+  invoiceRef String?
+  amount     Decimal   @db.Decimal(12, 2)
+  amountPaid Decimal   @default(0) @db.Decimal(12, 2)
+  dueDate    DateTime?
+  createdAt  DateTime  @default(now())
+  customer   Customer  @relation(fields: [customerId], references: [id])
 }
-
-// ---------- Expenses ----------
 
 model ExpenseCategory {
   id       String    @id @default(cuid())
@@ -333,33 +258,30 @@ model ExpenseCategory {
 model Expense {
   id            String          @id @default(cuid())
   categoryId    String
-  category      ExpenseCategory @relation(fields: [categoryId], references: [id])
   amount        Decimal         @db.Decimal(12, 2)
   date          DateTime        @default(now())
   paymentMethod PaymentMethod
+  status        ExpenseStatus   @default(PAID)
   description   String?
   attachmentUrl String?
   createdById   String
-  createdBy     User            @relation(fields: [createdById], references: [id])
   createdAt     DateTime        @default(now())
+  category      ExpenseCategory @relation(fields: [categoryId], references: [id])
+  createdBy     User            @relation(fields: [createdById], references: [id])
 }
-
-// ---------- Audit Log ----------
 
 model AuditLog {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id])
-  action       String
-  affectedType String
-  affectedId   String?
+  id            String   @id @default(cuid())
+  userId        String
+  action        String
+  affectedType  String
+  affectedId    String?
   previousValue Json?
-  newValue     Json?
-  reason       String?
-  createdAt    DateTime @default(now())
+  newValue      Json?
+  reason        String?
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id])
 }
-
-// ---------- System Settings ----------
 
 model SystemSettings {
   id                String   @id @default(cuid())
@@ -375,4 +297,59 @@ model SystemSettings {
   defaultTaxPercent Decimal  @default(0) @db.Decimal(5, 2)
   returnPolicy      String?
   updatedAt         DateTime @updatedAt
+}
+
+enum Role {
+  OWNER
+  STAFF
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PurchaseStatus {
+  DRAFT
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum StockMovementType {
+  OPENING_STOCK
+  PURCHASE
+  SALE
+  CUSTOMER_RETURN
+  SUPPLIER_RETURN
+  DAMAGE
+  LOSS
+  ADJUSTMENT
+}
+
+enum PaymentMethod {
+  CASH
+  ESEWA
+  KHALTI
+  FONEPAY
+  BANK_TRANSFER
+  CARD
+  CREDIT
+  OTHER
+}
+
+enum ExpenseStatus {
+  PAID
+  UNPAID
+}
+
+enum ReturnType {
+  RETURN
+  EXCHANGE
 }

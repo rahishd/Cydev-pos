@@ -47,6 +47,7 @@ interface FormState {
   minStockLevel: string;
   status: "ACTIVE" | "INACTIVE";
   imageUrl: string;
+  openingStock: string;
   variants: VariantRow[];
 }
 
@@ -63,6 +64,7 @@ const emptyForm = (): FormState => ({
   minStockLevel: "0",
   status: "ACTIVE",
   imageUrl: "",
+  openingStock: "0",
   variants: [],
 });
 
@@ -257,6 +259,23 @@ export function ProductsClient({ data }: { data: ProductsPageData }) {
       if (!v.sku.trim()) return setFormError("All variants must have a SKU.");
     }
 
+    // If creating new product with no variants, use opening stock for default variant
+    let variantsToSubmit = form.variants;
+    if (!editing && form.variants.length === 0 && parseInt(form.openingStock) > 0) {
+      variantsToSubmit = [
+        {
+          size: "",
+          color: "",
+          material: "",
+          sku: `${form.sku.trim().toUpperCase()}-001`,
+          purchasePrice: form.purchasePrice,
+          sellingPrice: form.sellingPrice,
+          quantity: form.openingStock,
+          minStockLevel: form.minStockLevel,
+        },
+      ];
+    }
+
     const input = {
       name: form.name.trim(),
       sku: form.sku.trim().toUpperCase(),
@@ -270,7 +289,7 @@ export function ProductsClient({ data }: { data: ProductsPageData }) {
       minStockLevel: parseInt(form.minStockLevel) || 0,
       status: form.status,
       imageUrl: form.imageUrl || undefined,
-      variants: form.variants.map((v) => ({
+      variants: variantsToSubmit.map((v) => ({
         id: v.id,
         size: v.size || undefined,
         color: v.color || undefined,
@@ -706,6 +725,29 @@ export function ProductsClient({ data }: { data: ProductsPageData }) {
                 />
               </div>
             </FormRow>
+
+            {/* Current/Opening Stock */}
+            {editing ? (
+              <div className="mt-3 rounded-md border-2 border-accent/30 bg-accent/5 p-3">
+                <Label className="text-xs text-text-muted">Current Stock (All Variants)</Label>
+                <div className="mt-1 text-2xl font-bold text-accent">
+                  {form.variants.reduce((sum, v) => sum + (parseInt(v.quantity) || 0), 0)} units
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3">
+                <Label htmlFor="f-os">Opening Stock</Label>
+                <Input
+                  id="f-os"
+                  type="number"
+                  min="0"
+                  value={form.openingStock}
+                  onChange={(e) => setForm((p) => ({ ...p, openingStock: e.target.value }))}
+                  placeholder="0"
+                />
+                <p className="mt-1 text-xs text-text-muted">Initial stock amount for the product</p>
+              </div>
+            )}
           </div>
 
           {/* ── Variants ── */}

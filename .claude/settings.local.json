@@ -6,7 +6,10 @@
       "Bash(npm install *)",
       "Bash(npm audit *)",
       "Bash(npx prisma *)",
-      "Bash(npm view *)"
+      "Bash(npm view *)",
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'feat: add Expenses module with full CRUD, file uploads, and filtering *)"
     ]
   }
 }

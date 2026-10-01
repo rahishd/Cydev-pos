@@ -40,16 +40,29 @@ export async function getProductsPageData() {
     }),
   ]);
 
-  const activeCount = products.filter((p) => p.status === "ACTIVE").length;
-  const inactiveCount = products.filter((p) => p.status === "INACTIVE").length;
+  // Convert Decimal values to numbers for client serialization
+  const serializedProducts = products.map((p) => ({
+    ...p,
+    purchasePrice: Number(p.purchasePrice),
+    sellingPrice: Number(p.sellingPrice),
+    discountPrice: p.discountPrice ? Number(p.discountPrice) : null,
+    variants: p.variants.map((v) => ({
+      ...v,
+      purchasePrice: Number(v.purchasePrice),
+      sellingPrice: Number(v.sellingPrice),
+    })),
+  }));
+
+  const activeCount = serializedProducts.filter((p) => p.status === "ACTIVE").length;
+  const inactiveCount = serializedProducts.filter((p) => p.status === "INACTIVE").length;
 
   return {
-    products,
+    products: serializedProducts,
     categories,
     brands,
     suppliers,
     stats: {
-      total: products.length,
+      total: serializedProducts.length,
       active: activeCount,
       inactive: inactiveCount,
       categories: categories.length,
