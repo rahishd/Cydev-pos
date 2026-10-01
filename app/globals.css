@@ -342,16 +342,15 @@ table tbody tr:hover {
   left: 0;
   right: 0;
   text-align: center;
-  padding: 12px 20px;
-  background: rgba(255, 255, 255, 0.1);
+  padding: 8px 20px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   z-index: 1000;
   font-family: var(--font-inter);
   font-weight: 500;
-  font-size: 13px;
-  letter-spacing: 0.3px;
+  font-size: 10px;
+  letter-spacing: 0.2px;
   background: linear-gradient(90deg,
     rgba(255, 149, 0, 0.08) 0%,
     rgba(255, 255, 255, 0.1) 50%,
@@ -365,22 +364,22 @@ table tbody tr:hover {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
 }
 
 /* Adjust main content to account for credit footer */
 main {
-  margin-top: 50px;
+  margin-top: 40px;
 }
 
 @media (max-width: 768px) {
   .credit-footer {
-    padding: 10px 15px;
-    font-size: 12px;
+    padding: 6px 15px;
+    font-size: 9px;
   }
 
   main {
-    margin-top: 45px;
+    margin-top: 36px;
   }
 }
