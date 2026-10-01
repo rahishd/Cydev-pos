@@ -3,7 +3,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 export interface UsersPageData {
   users: Array<{
