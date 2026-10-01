@@ -19,7 +19,7 @@ const navItems = [
 
 export function Sidebar() {
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-surface">
+    <aside className="flex w-56 shrink-0 flex-col glass-container border-r border-r-white/30 rounded-none">
       <div className="px-4 py-4 text-sm font-semibold text-text">
         Bag &amp; Shoes
       </div>

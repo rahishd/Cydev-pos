@@ -9,7 +9,7 @@ export function Topbar({
   userRole: string;
 }) {
   return (
-    <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-6">
+    <header className="flex h-14 items-center justify-between glass-container rounded-none border-b border-b-white/30 px-6">
       <div />
       <div className="flex items-center gap-3">
         <div className="text-right leading-tight">
