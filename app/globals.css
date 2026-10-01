@@ -28,7 +28,10 @@
 }
 
 body {
-  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8f0 100%);
+  background:
+    linear-gradient(135deg, rgba(245, 245, 245, 0.92), rgba(232, 232, 240, 0.92)),
+    url('/mountain-bg.webp') center/cover fixed no-repeat;
+  background-attachment: fixed;
   color: var(--color-text);
   font-family: var(--font-sans);
   min-height: 100vh;
