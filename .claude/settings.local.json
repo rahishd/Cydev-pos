@@ -9,7 +9,8 @@
       "Bash(npm view *)",
       "Bash(npm run *)",
       "Bash(git add *)",
-      "Bash(git commit -m 'feat: add Expenses module with full CRUD, file uploads, and filtering *)"
+      "Bash(git commit -m 'feat: add Expenses module with full CRUD, file uploads, and filtering *)",
+      "Bash(git commit -m 'fix: handle missing userId in stock movement creation for products *)"
     ]
   }
 }

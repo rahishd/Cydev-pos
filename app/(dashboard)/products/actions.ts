@@ -154,7 +154,7 @@ export async function createProduct(input: ProductInput) {
         },
       });
 
-      if (v.quantity > 0) {
+      if (v.quantity > 0 && userId) {
         await tx.stockMovement.create({
           data: {
             productVariantId: variant.id,
@@ -233,7 +233,7 @@ export async function updateProduct(
           },
         });
 
-        if (v.quantity > 0) {
+        if (v.quantity > 0 && userId) {
           await tx.stockMovement.create({
             data: {
               productVariantId: variant.id,
