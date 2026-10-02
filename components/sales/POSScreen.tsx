@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { formatCurrency } from "@/lib/date-utils";
 import { PaymentModal } from "./PaymentModal";
+import { OrderReview } from "./OrderReview";
 import { InvoicePreview } from "./InvoicePreview";
 
 type CartItem = {
@@ -63,6 +64,7 @@ export function POSScreen({ staffId, staffName }: { staffId: string; staffName: 
   const [showCustomerSelector, setShowCustomerSelector] = useState(false);
 
   // Modals
+  const [showOrderReview, setShowOrderReview] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
   const [lastInvoice, setLastInvoice] = useState<any>(null);
@@ -419,15 +421,35 @@ export function POSScreen({ staffId, staffName }: { staffId: string; staffName: 
             </div>
 
             <Button
-              onClick={() => setShowPayment(true)}
+              onClick={() => setShowOrderReview(true)}
               disabled={cart.length === 0}
               className="w-full"
             >
-              Proceed to Payment
+              Review Order
             </Button>
           </Card>
         )}
       </div>
+
+      {/* Order Review Modal */}
+      {showOrderReview && (
+        <OrderReview
+          cart={cart}
+          discount={discount}
+          tax={tax}
+          subtotal={subtotal}
+          total={total}
+          onUpdateDiscount={setDiscount}
+          onUpdateTax={setTax}
+          onUpdateQuantity={updateCartItem}
+          onRemoveItem={removeFromCart}
+          onBack={() => setShowOrderReview(false)}
+          onProceedToPayment={() => {
+            setShowOrderReview(false);
+            setShowPayment(true);
+          }}
+        />
+      )}
 
       {/* Payment Modal */}
       {showPayment && (
