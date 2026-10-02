@@ -375,66 +375,62 @@ export function NewSaleFlow({ staffId, staffName }: { staffId: string; staffName
             </Button>
           </div>
         )}
+
+        {/* Order Review Modal */}
+        {showOrderReview && (
+          <OrderReview
+            cart={cart}
+            discount={discount}
+            tax={tax}
+            subtotal={subtotal}
+            total={total}
+            onUpdateDiscount={setDiscount}
+            onUpdateTax={setTax}
+            onUpdateQuantity={(variantId, newQty) => {
+              setCart(
+                cart.map((i) =>
+                  i.variantId === variantId ? { ...i, quantity: newQty } : i
+                )
+              );
+            }}
+            onRemoveItem={(variantId) => {
+              setCart(cart.filter((i) => i.variantId !== variantId));
+            }}
+            onBack={() => {
+              setShowOrderReview(false);
+            }}
+            onProceedToPayment={() => {
+              setShowOrderReview(false);
+              setShowPayment(true);
+            }}
+          />
+        )}
+
+        {/* Payment Modal */}
+        {showPayment && (
+          <PaymentModal
+            isOpen={showPayment}
+            onClose={() => setShowPayment(false)}
+            total={total}
+            customer={null}
+            onComplete={handleCompletePayment}
+          />
+        )}
+
+        {/* Invoice Preview */}
+        {showInvoice && lastInvoice && (
+          <InvoicePreview
+            isOpen={showInvoice}
+            onClose={() => {
+              setShowInvoice(false);
+              setLastInvoice(null);
+            }}
+            invoice={lastInvoice}
+          />
+        )}
       </div>
     );
   }
 
-  // ORDER REVIEW & PAYMENT
-  return (
-    <>
-      {/* Order Review Modal */}
-      {showOrderReview && (
-        <OrderReview
-          cart={cart}
-          discount={discount}
-          tax={tax}
-          subtotal={subtotal}
-          total={total}
-          onUpdateDiscount={setDiscount}
-          onUpdateTax={setTax}
-          onUpdateQuantity={(variantId, newQty) => {
-            setCart(
-              cart.map((i) =>
-                i.variantId === variantId ? { ...i, quantity: newQty } : i
-              )
-            );
-          }}
-          onRemoveItem={(variantId) => {
-            setCart(cart.filter((i) => i.variantId !== variantId));
-          }}
-          onBack={() => {
-            setShowOrderReview(false);
-            setStep("search");
-          }}
-          onProceedToPayment={() => {
-            setShowOrderReview(false);
-            setShowPayment(true);
-          }}
-        />
-      )}
-
-      {/* Payment Modal */}
-      {showPayment && (
-        <PaymentModal
-          isOpen={showPayment}
-          onClose={() => setShowPayment(false)}
-          total={total}
-          customer={null}
-          onComplete={handleCompletePayment}
-        />
-      )}
-
-      {/* Invoice Preview */}
-      {showInvoice && lastInvoice && (
-        <InvoicePreview
-          isOpen={showInvoice}
-          onClose={() => {
-            setShowInvoice(false);
-            setLastInvoice(null);
-          }}
-          invoice={lastInvoice}
-        />
-      )}
-    </>
-  );
+  return null;
 }
