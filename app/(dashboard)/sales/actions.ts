@@ -105,9 +105,12 @@ export async function createSale(
   subtotal: number,
   discount: number,
   tax: number,
-  paymentMethod: string,
+  payments: Array<{ method: string; amount: number }> | string,
   amountPaid: number,
-  dueDate?: Date
+  dueDate?: Date,
+  deliveryMethod: string = "IN_SHOP",
+  deliveryAddress?: string,
+  deliveryPhone?: string
 ) {
   // Generate invoice number
   const lastSale = await prisma.sale.findFirst({
@@ -123,6 +126,14 @@ export async function createSale(
   // Calculate total
   const total = subtotal - discount + tax;
 
+  // Normalize payments array
+  const paymentsList: Array<{ method: string; amount: number }> = Array.isArray(payments)
+    ? payments
+    : [{ method: payments as string, amount: amountPaid }];
+
+  // Determine if credit sale
+  const isCreditSale = paymentsList.some((p) => p.method === "CREDIT");
+
   // Create sale with items
   const sale = await prisma.sale.create({
     data: {
@@ -134,6 +145,10 @@ export async function createSale(
       tax: new Decimal(tax),
       total: new Decimal(total),
       amountPaid: new Decimal(amountPaid),
+      deliveryMethod: deliveryMethod as any,
+      deliveryAddress: deliveryAddress || null,
+      deliveryPhone: deliveryPhone || null,
+      status: deliveryMethod === "COD" ? "PENDING" : "COMPLETED",
       items: {
         create: items.map((item) => ({
           productVariantId: item.variantId,
@@ -157,14 +172,16 @@ export async function createSale(
     },
   });
 
-  // Create payment record
-  await prisma.payment.create({
-    data: {
-      saleId: sale.id,
-      method: paymentMethod as any,
-      amount: new Decimal(amountPaid),
-    },
-  });
+  // Create payment records for each payment method
+  for (const payment of paymentsList) {
+    await prisma.payment.create({
+      data: {
+        saleId: sale.id,
+        method: payment.method as any,
+        amount: new Decimal(payment.amount),
+      },
+    });
+  }
 
   // Create stock movements and reduce inventory
   for (const item of items) {
@@ -199,7 +216,7 @@ export async function createSale(
   }
 
   // If credit sale, create customer credit record
-  if (paymentMethod === "CREDIT" && customerId) {
+  if (isCreditSale && customerId) {
     const outstandingAmount = total - amountPaid;
     if (outstandingAmount > 0) {
       await prisma.customerCredit.create({

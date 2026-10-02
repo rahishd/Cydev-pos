@@ -145,6 +145,7 @@ export function POSScreen({ staffId, staffName }: { staffId: string; staffName: 
         discount: item.discount,
       }));
 
+      // Process all payment parts
       const result = await createSale(
         selectedCustomer?.id || null,
         staffId,
@@ -152,9 +153,12 @@ export function POSScreen({ staffId, staffName }: { staffId: string; staffName: 
         subtotal,
         discount,
         tax,
-        paymentData.method,
+        paymentData.payments || [{ method: paymentData.method, amount: paymentData.amountPaid }],
         paymentData.amountPaid,
-        paymentData.dueDate
+        paymentData.dueDate,
+        paymentData.deliveryMethod,
+        paymentData.deliveryAddress,
+        paymentData.deliveryPhone
       );
 
       setLastInvoice({
@@ -231,38 +235,62 @@ export function POSScreen({ staffId, staffName }: { staffId: string; staffName: 
         </Card>
 
         {/* Product Grid */}
-        <div className="grid grid-cols-3 gap-3">
-          {products.map((product) =>
-            product.variants.map((variant) => (
-              <Card key={variant.id} className="p-3 hover:bg-zinc-50 cursor-pointer">
+        <div className="grid grid-cols-2 gap-3">
+          {products.map((product) => {
+            const totalStock = product.variants.reduce((sum, v) => sum + v.quantity, 0);
+            const inStock = totalStock > 0;
+
+            return (
+              <Card key={product.id} className={`p-3 hover:shadow-md transition-all ${inStock ? "cursor-pointer" : ""}`}>
                 <div className="space-y-2">
-                  <div className="text-xs font-semibold text-text">{product.name}</div>
-                  <div className="text-xs text-text-muted">
-                    {variant.size && <span>{variant.size}</span>}
-                    {variant.size && variant.color && <span> / </span>}
-                    {variant.color && <span>{variant.color}</span>}
+                  <div className="text-sm font-bold text-text">{product.name}</div>
+                  <div className="text-xs text-text-muted">{product.brand?.name || "No Brand"}</div>
+
+                  {/* Variant Selection */}
+                  <div className="space-y-1">
+                    {product.variants.length > 0 && (
+                      <div className="text-xs font-semibold text-text-muted mb-1">
+                        Select Variant:
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-1 max-h-24 overflow-y-auto">
+                      {product.variants.map((variant) => (
+                        <button
+                          key={variant.id}
+                          onClick={() => addToCart(variant.id, 1, variant, product)}
+                          disabled={variant.quantity === 0}
+                          className={`px-2 py-1.5 rounded text-xs font-medium text-left transition-colors flex justify-between items-center ${
+                            variant.quantity === 0
+                              ? "bg-zinc-100 text-text-muted cursor-not-allowed"
+                              : "bg-orange-50 text-text hover:bg-orange-100"
+                          }`}
+                        >
+                          <span>
+                            {variant.size && <span>{variant.size}</span>}
+                            {variant.size && variant.color && <span> / </span>}
+                            {variant.color && <span>{variant.color}</span>}
+                            {!variant.size && !variant.color && <span>Standard</span>}
+                          </span>
+                          <span className="text-xs font-semibold text-accent">
+                            {variant.quantity === 0 ? "0" : variant.quantity}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="text-sm font-bold text-accent">
-                    NPR {formatCurrency(Number(variant.sellingPrice))}
+
+                  <div className="pt-2 border-t border-border">
+                    <div className="text-sm font-bold text-accent">
+                      NPR {formatCurrency(Number(product.variants[0]?.sellingPrice || 0))}
+                    </div>
+                    <div className="text-xs text-text-muted">
+                      Stock: {totalStock} units
+                    </div>
                   </div>
-                  <div className="text-xs text-text-muted">
-                    Stock: {variant.quantity}
-                  </div>
-                  <button
-                    onClick={() => addToCart(variant.id, 1, variant, product)}
-                    disabled={variant.quantity === 0}
-                    className={`w-full py-1 px-2 text-xs rounded font-medium transition-colors ${
-                      variant.quantity === 0
-                        ? "bg-zinc-100 text-text-muted cursor-not-allowed"
-                        : "bg-accent text-white hover:bg-accent-hover"
-                    }`}
-                  >
-                    {variant.quantity === 0 ? "OUT OF STOCK" : "Add to Cart"}
-                  </button>
                 </div>
               </Card>
-            ))
-          )}
+            );
+          })}
         </div>
       </div>
 

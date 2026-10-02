@@ -63,8 +63,11 @@ async function main() {
     const product1 = await prisma.product.create({
       data: {
         name: "Nike Air Max",
+        sku: "NK-AIR-MAX-001",
         categoryId: shoesCategory.id,
         brandId: nikerBrand.id,
+        purchasePrice: "4500",
+        sellingPrice: "6500",
         status: "ACTIVE",
         variants: {
           create: [
@@ -106,8 +109,11 @@ async function main() {
     const product2 = await prisma.product.create({
       data: {
         name: "Adidas Running Shoe",
+        sku: "AD-RUN-SHOE-001",
         categoryId: shoesCategory.id,
         brandId: adidasBrand.id,
+        purchasePrice: "3800",
+        sellingPrice: "5500",
         status: "ACTIVE",
         variants: {
           create: [
@@ -139,8 +145,11 @@ async function main() {
     const product3 = await prisma.product.create({
       data: {
         name: "Wildcraft Backpack",
+        sku: "WC-BACKPACK-001",
         categoryId: bagsCategory.id,
         brandId: wildcraftBrand.id,
+        purchasePrice: "2200",
+        sellingPrice: "3500",
         status: "ACTIVE",
         variants: {
           create: [
