@@ -106,6 +106,13 @@ export async function createProduct(input: ProductInput) {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
   const userId = session.user.id;
+  if (!userId) throw new Error("User ID not found in session. Please log in again.");
+
+  // Verify user exists in database
+  const userExists = await prisma.user.findUnique({ where: { id: userId } });
+  if (!userExists) {
+    throw new Error("User account not found in database. Please log out and log back in.");
+  }
 
   const variants =
     input.variants.length > 0
@@ -178,6 +185,13 @@ export async function updateProduct(
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
   const userId = session.user.id;
+  if (!userId) throw new Error("User ID not found in session. Please log in again.");
+
+  // Verify user exists in database
+  const userExists = await prisma.user.findUnique({ where: { id: userId } });
+  if (!userExists) {
+    throw new Error("User account not found in database. Please log out and log back in.");
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.product.update({

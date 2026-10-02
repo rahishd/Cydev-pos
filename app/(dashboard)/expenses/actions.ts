@@ -13,7 +13,6 @@ export interface ExpensesPageData {
     amount: number;
     date: Date;
     paymentMethod: string;
-    status: string;
     description: string | null;
     attachmentUrl: string | null;
     createdById: string;
@@ -51,7 +50,6 @@ export async function getExpensesPageData(): Promise<ExpensesPageData> {
       amount: true,
       date: true,
       paymentMethod: true,
-      status: true,
       description: true,
       attachmentUrl: true,
       createdById: true,
@@ -111,12 +109,8 @@ export async function getExpensesPageData(): Promise<ExpensesPageData> {
     }
   }
 
-  // Calculate unpaid total
-  const unpaidExpenses = expenses.filter((e) => e.status === "UNPAID");
-  const unpaidTotal = unpaidExpenses.reduce(
-    (sum, e) => sum + parseFloat(e.amount.toString()),
-    0
-  );
+  // Calculate unpaid total (feature to be implemented when status column is available)
+  const unpaidTotal = 0;
 
   const expensesData = expenses.map((e) => ({
     ...e,
@@ -142,7 +136,6 @@ export async function createExpense({
   amount,
   date,
   paymentMethod,
-  status,
   description,
   attachmentUrl,
 }: {
@@ -150,7 +143,6 @@ export async function createExpense({
   amount: number;
   date: Date;
   paymentMethod: string;
-  status: string;
   description?: string;
   attachmentUrl?: string;
 }) {
@@ -169,7 +161,6 @@ export async function createExpense({
       amount: new Decimal(amount.toString()),
       date,
       paymentMethod,
-      status: (status as "PAID" | "UNPAID") || "PAID",
       description: description || null,
       attachmentUrl: attachmentUrl || null,
       createdById: session.user.id,
@@ -191,7 +182,6 @@ export async function createExpense({
         amount: expense.amount.toString(),
         categoryId: expense.categoryId,
         paymentMethod: expense.paymentMethod,
-        status: expense.status,
       },
     },
   });
@@ -228,7 +218,6 @@ export async function updateExpense({
       categoryId: true,
       amount: true,
       paymentMethod: true,
-      status: true,
       description: true,
       attachmentUrl: true,
     },
@@ -242,7 +231,6 @@ export async function updateExpense({
       amount: new Decimal(amount.toString()),
       date,
       paymentMethod,
-      status: (status as "PAID" | "UNPAID") || "PAID",
       description: description || null,
       attachmentUrl: attachmentUrl || null,
     },
@@ -263,13 +251,11 @@ export async function updateExpense({
         categoryId: existing.categoryId,
         amount: existing.amount.toString(),
         paymentMethod: existing.paymentMethod,
-        status: existing.status,
       },
       newValue: {
         categoryId: updated.categoryId,
         amount: updated.amount.toString(),
         paymentMethod: updated.paymentMethod,
-        status: updated.status,
       },
     },
   });
@@ -303,7 +289,6 @@ export async function deleteExpense(id: string) {
         amount: expense.amount.toString(),
         categoryId: expense.categoryId,
         paymentMethod: expense.paymentMethod,
-        status: expense.status,
       },
     },
   });

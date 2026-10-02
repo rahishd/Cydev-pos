@@ -131,7 +131,7 @@ export async function getVariantDetails(variantId: string) {
     where: { productVariantId: variantId },
     select: {
       type: true,
-      quantity: true,
+      quantityChange: true,
     },
   });
 
@@ -147,14 +147,14 @@ export async function getVariantDetails(variantId: string) {
   };
 
   movements.forEach((m) => {
-    if (m.type === "OPENING_STOCK") stockSummary.openingStock += m.quantity;
-    if (m.type === "PURCHASE") stockSummary.purchased += m.quantity;
-    if (m.type === "SALE") stockSummary.sold += m.quantity;
-    if (m.type === "CUSTOMER_RETURN") stockSummary.customerReturns += m.quantity;
-    if (m.type === "SUPPLIER_RETURN") stockSummary.supplierReturns += m.quantity;
-    if (m.type === "DAMAGE") stockSummary.damaged += m.quantity;
-    if (m.type === "LOSS") stockSummary.loss += m.quantity;
-    if (m.type === "MANUAL_ADJUSTMENT") stockSummary.manualAdjustment += m.quantity;
+    if (m.type === "OPENING_STOCK") stockSummary.openingStock += m.quantityChange;
+    if (m.type === "PURCHASE") stockSummary.purchased += m.quantityChange;
+    if (m.type === "SALE") stockSummary.sold += Math.abs(m.quantityChange);
+    if (m.type === "CUSTOMER_RETURN") stockSummary.customerReturns += m.quantityChange;
+    if (m.type === "SUPPLIER_RETURN") stockSummary.supplierReturns += Math.abs(m.quantityChange);
+    if (m.type === "DAMAGE") stockSummary.damaged += Math.abs(m.quantityChange);
+    if (m.type === "LOSS") stockSummary.loss += Math.abs(m.quantityChange);
+    if (m.type === "MANUAL_ADJUSTMENT") stockSummary.manualAdjustment += m.quantityChange;
   });
 
   const inventoryValue = variant.quantity * Number(variant.purchasePrice);
@@ -182,10 +182,10 @@ export async function getStockMovements(
     select: {
       id: true,
       type: true,
-      quantity: true,
-      notes: true,
+      quantityChange: true,
+      reason: true,
       createdAt: true,
-      user: { select: { name: true } },
+      createdBy: { select: { name: true } },
       productVariant: {
         select: {
           sku: true,
@@ -206,7 +206,7 @@ export async function createStockMovement(
   variantId: string,
   type: string,
   quantity: number,
-  notes: string,
+  reason: string,
   userId: string
 ) {
   const variant = await prisma.productVariant.findUnique({
@@ -219,9 +219,9 @@ export async function createStockMovement(
     data: {
       productVariantId: variantId,
       type,
-      quantity,
-      notes,
-      userId,
+      quantityChange: quantity,
+      reason,
+      createdById: userId,
     },
   });
 
