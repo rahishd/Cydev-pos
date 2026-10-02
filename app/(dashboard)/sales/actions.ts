@@ -53,6 +53,15 @@ export async function getProductsForPOS(search?: string, categoryId?: string, br
     orderBy: { name: "asc" },
   });
 
+  const serialized = products.map((p) => ({
+    ...p,
+    variants: p.variants.map((v) => ({
+      ...v,
+      sellingPrice: Number(v.sellingPrice),
+      purchasePrice: Number(v.purchasePrice),
+    })),
+  }));
+
   // Get categories and brands for filters
   const [categories, brands] = await Promise.all([
     prisma.category.findMany({
@@ -65,7 +74,7 @@ export async function getProductsForPOS(search?: string, categoryId?: string, br
     }),
   ]);
 
-  return { products, categories, brands };
+  return { products: serialized, categories, brands };
 }
 
 export async function getCustomers(search?: string) {
