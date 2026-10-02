@@ -727,27 +727,34 @@ export function ProductsClient({ data }: { data: ProductsPageData }) {
             </FormRow>
 
             {/* Current/Opening Stock */}
-            {editing ? (
-              <div className="mt-3 rounded-md border-2 border-accent/30 bg-accent/5 p-3">
-                <Label className="text-xs text-text-muted">Current Stock (All Variants)</Label>
-                <div className="mt-1 text-2xl font-bold text-accent">
-                  {form.variants.reduce((sum, v) => sum + (parseInt(v.quantity) || 0), 0)} units
+            <div className="mt-3">
+              <Label htmlFor="f-os">
+                {editing ? "Adjust Stock Level" : "Opening Stock"}
+              </Label>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <Input
+                    id="f-os"
+                    type="number"
+                    min="0"
+                    value={form.openingStock}
+                    onChange={(e) => setForm((p) => ({ ...p, openingStock: e.target.value }))}
+                    placeholder="0"
+                  />
+                  <p className="mt-1 text-xs text-text-muted">
+                    {editing ? "Adjust the opening/current stock level" : "Initial stock amount for the product"}
+                  </p>
                 </div>
+                {editing && (
+                  <div className="rounded-md border-2 border-accent/30 bg-accent/5 p-3">
+                    <div className="text-xs text-text-muted">Variant Total</div>
+                    <div className="mt-1 text-xl font-bold text-accent">
+                      {form.variants.reduce((sum, v) => sum + (parseInt(v.quantity) || 0), 0)} units
+                    </div>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="mt-3">
-                <Label htmlFor="f-os">Opening Stock</Label>
-                <Input
-                  id="f-os"
-                  type="number"
-                  min="0"
-                  value={form.openingStock}
-                  onChange={(e) => setForm((p) => ({ ...p, openingStock: e.target.value }))}
-                  placeholder="0"
-                />
-                <p className="mt-1 text-xs text-text-muted">Initial stock amount for the product</p>
-              </div>
-            )}
+            </div>
           </div>
 
           {/* ── Variants ── */}
