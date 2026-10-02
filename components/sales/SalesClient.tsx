@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import { POSScreen } from "./POSScreen";
+import { NewSaleFlow } from "./NewSaleFlow";
 import { SalesHistoryTab } from "./SalesHistoryTab";
 import { ReturnsExchangesTab } from "./ReturnsExchangesTab";
 import { Button } from "@/components/ui/Button";
@@ -51,7 +51,7 @@ export function SalesClient({
       {/* Content */}
       <div>
         {activeTab === "pos" && session && (
-          <POSScreen staffId={session.user.id} staffName={session.user.name} />
+          <NewSaleFlow staffId={session.user.id} staffName={session.user.name} />
         )}
         {activeTab === "history" && (
           <SalesHistoryTab
