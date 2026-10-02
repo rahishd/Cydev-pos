@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Card } from "@/components/ui/Card";
 import { formatCurrency } from "@/lib/date-utils";
+import { searchCustomersByNameOrPhone } from "@/app/(dashboard)/sales/actions";
 
 type Customer = {
   id: string;
@@ -45,8 +46,42 @@ export function PaymentModal({
   const [deliveryAddress, setDeliveryAddress] = useState(customer?.address || "");
   const [deliveryPhone, setDeliveryPhone] = useState(customer?.phone || "");
 
+  // Customer lookup
+  const [customerName, setCustomerName] = useState(customer?.name || "");
+  const [customerPhone, setCustomerPhone] = useState(customer?.phone || "");
+  const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
   const balance = total - totalPaid;
+
+  // Auto-search customers
+  useEffect(() => {
+    const query = customerName || customerPhone;
+    if (!query.trim()) {
+      setCustomerSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchCustomersByNameOrPhone(query);
+        setCustomerSuggestions(results);
+        setShowSuggestions(true);
+      } catch (err) {
+        console.error("Search failed:", err);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [customerName, customerPhone]);
+
+  const handleSelectCustomer = (cust: any) => {
+    setCustomerName(cust.name);
+    setCustomerPhone(cust.phone || "");
+    setDeliveryAddress(cust.address || "");
+    setShowSuggestions(false);
+  };
 
   const handleAddPayment = () => {
     setPayments([...payments, { method: "CASH", amount: Math.max(0, balance) }]);
@@ -110,6 +145,49 @@ export function PaymentModal({
             )}
           </div>
         </Card>
+
+        {/* Customer Lookup */}
+        <div className="space-y-3 border-b border-border pb-3">
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">Customer Name</label>
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="Enter customer name or phone number"
+                value={customerName}
+                onChange={(e) => {
+                  setCustomerName(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => customerSuggestions.length > 0 && setShowSuggestions(true)}
+              />
+              {showSuggestions && customerSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 bg-white border border-border rounded mt-1 z-10 shadow-lg max-h-40 overflow-y-auto">
+                  {customerSuggestions.map((cust) => (
+                    <button
+                      key={cust.id}
+                      onClick={() => handleSelectCustomer(cust)}
+                      className="w-full text-left px-3 py-2 hover:bg-zinc-50 border-b last:border-0 text-sm"
+                    >
+                      <div className="font-medium text-text">{cust.name}</div>
+                      <div className="text-xs text-text-muted">{cust.phone}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">Contact Number</label>
+            <Input
+              type="tel"
+              placeholder="Enter phone number"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+            />
+          </div>
+        </div>
 
         {/* Delivery Method */}
         <div>

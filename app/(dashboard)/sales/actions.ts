@@ -107,6 +107,38 @@ export async function getCustomers(search?: string) {
   }));
 }
 
+export async function searchCustomersByNameOrPhone(query: string) {
+  if (!query.trim()) return [];
+
+  const customers = await prisma.customer.findMany({
+    where: {
+      OR: [
+        { name: { contains: query, mode: "insensitive" } },
+        { phone: { contains: query, mode: "insensitive" } },
+      ],
+    },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      address: true,
+      email: true,
+      credits: { select: { amount: true, amountPaid: true } },
+    },
+    orderBy: { name: "asc" },
+    take: 10,
+  });
+
+  return customers.map((c) => ({
+    id: c.id,
+    name: c.name,
+    phone: c.phone || "",
+    address: c.address || "",
+    email: c.email || "",
+    outstanding: c.credits.reduce((sum, cr) => sum + (Number(cr.amount) - Number(cr.amountPaid)), 0),
+  }));
+}
+
 export async function createSale(
   customerId: string | null,
   staffId: string,
