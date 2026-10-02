@@ -785,11 +785,6 @@ export function ProductsClient({ data }: { data: ProductsPageData }) {
                       <div className="mb-2 flex items-center justify-between">
                         <span className="text-xs font-medium text-text-muted">
                           {isExisting ? "Variant" : "New Variant"} #{idx + 1}
-                          {isExisting && (
-                            <span className="ml-2 font-normal text-text-muted/60">
-                              (stock qty: {v.quantity})
-                            </span>
-                          )}
                         </span>
                         {!isExisting && (
                           <button
@@ -851,19 +846,28 @@ export function ProductsClient({ data }: { data: ProductsPageData }) {
                             className="text-xs"
                           />
                         </div>
-                        {!isExisting && (
-                          <div>
-                            <Label className="text-xs">Opening Qty</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={v.quantity}
-                              onChange={(e) => setVariantField(idx, "quantity", e.target.value)}
-                              placeholder="0"
-                              className="text-xs"
-                            />
-                          </div>
-                        )}
+                        <div>
+                          <Label className="text-xs">{isExisting ? "Stock Qty" : "Opening Qty"}</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={v.quantity}
+                            onChange={(e) => setVariantField(idx, "quantity", e.target.value)}
+                            placeholder="0"
+                            className="text-xs"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Min Stock</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={v.minStockLevel}
+                            onChange={(e) => setVariantField(idx, "minStockLevel", e.target.value)}
+                            placeholder="0"
+                            className="text-xs"
+                          />
+                        </div>
                       </div>
                     </div>
                   );
