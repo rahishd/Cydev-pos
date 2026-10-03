@@ -42,7 +42,7 @@ export function MobileHeader({
             {first.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1 leading-tight">
-            <div className="truncate text-lg font-semibold">Hi, {first}</div>
+            <div className="truncate text-lg font-semibold">Hi, {userName.trim() || "there"}</div>
             <div className="text-xs text-white/80">
               {userRole === "OWNER" ? "Owner" : "Staff"}
             </div>
