@@ -20,7 +20,7 @@ export default async function DashboardLayout({
 
   return (
     <SettingsProvider settings={settings} access={{ isOwner: access.isOwner, permissions: access.permissions }}>
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen lg:min-h-[calc(100vh-2rem)]">
       <PaymentNotifier />
       <Sidebar
         isOwner={access.isOwner}

@@ -364,7 +364,21 @@ table tbody tr:hover {
 
 /* Adjust main content to account for credit footer */
 main {
-  margin-top: 40px;
+  margin-top: 0;
+}
+
+/* Desktop: the credit strip is a fixed 32px bar, and the whole app sits below it. */
+@media (min-width: 1024px) {
+  body {
+    padding-top: 2rem;
+  }
+  .credit-footer {
+    display: flex;
+    height: 2rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -373,9 +387,6 @@ main {
     font-size: 9px;
   }
 
-  main {
-    margin-top: 36px;
-  }
 }
 
 /* Phones and tablets: the credit line sits above the page instead of floating over the header */

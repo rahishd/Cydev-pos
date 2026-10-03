@@ -18,7 +18,7 @@ export function Sidebar({
   const visible = NAV_ITEMS.filter((item) => canSee(item, isOwner, permissions));
 
   return (
-    <aside className="hidden w-56 shrink-0 lg:flex flex-col glass-container border-r border-r-white/30 rounded-none">
+    <aside className="sticky top-8 hidden h-[calc(100vh-2rem)] w-56 shrink-0 self-start flex-col overflow-y-auto border-r border-border bg-surface lg:flex">
       <div className="flex items-center gap-2.5 px-4 py-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={logo} alt={shopName} className="h-9 w-9 rounded-md object-contain" />
