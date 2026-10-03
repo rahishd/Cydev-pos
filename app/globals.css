@@ -465,3 +465,19 @@ main {
   background: #1f1a14;
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
+
+/* Phones and tablets: wide tables keep a readable width and scroll sideways inside their card. */
+@media (max-width: 1023px) {
+  .glass-card,
+  .glass-table,
+  .glass-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  .glass-card table,
+  .glass-table table,
+  .glass-container table {
+    min-width: 640px;
+  }
+}
