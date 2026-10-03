@@ -49,6 +49,8 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "sales.return", label: "Process Return" },
       { key: "sales.exchange", label: "Process Exchange" },
       { key: "sales.history", label: "View Sales History" },
+      { key: "sales.online_payment", label: "Collect Online (QR) Payments" },
+      { key: "sales.share", label: "Share / Download Invoice PDF" },
     ],
   },
   {
@@ -95,6 +97,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "expenses.add", label: "Add Expense" },
       { key: "expenses.edit", label: "Edit Expense" },
       { key: "expenses.delete", label: "Delete Expense" },
+      { key: "expenses.export", label: "Share Voucher / Export Expense Report" },
     ],
   },
   {
@@ -109,6 +112,16 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "reports.net_profit", label: "Net Profit Reports" },
       { key: "reports.financial", label: "Financial Reports" },
     ],
+  },
+  {
+    key: "data",
+    label: "Data",
+    items: [{ key: "data.export", label: "Export Data (CSV: products, sales, customers, expenses)" }],
+  },
+  {
+    key: "notifications",
+    label: "Notifications",
+    items: [{ key: "notifications.push", label: "Receive Phone Notifications" }],
   },
   {
     key: "audit",

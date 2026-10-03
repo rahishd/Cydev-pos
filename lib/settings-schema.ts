@@ -351,7 +351,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     id: "backup",
     label: "Backup & Data",
     description: "Download your data. Restoring is done through your database provider.",
-    permission: "settings.system",
+    permission: "data.export",
     custom: "backup",
     fields: [
       {

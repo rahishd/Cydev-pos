@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSettings } from "@/components/providers/SettingsProvider";
+import { useCan, useSettings } from "@/components/providers/SettingsProvider";
 import { getInvoiceShareUrl } from "@/app/(dashboard)/sales/actions";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -27,14 +27,15 @@ export function InvoicePreview({
 }) {
   const [contact, setContact] = useState<string>(invoice.customer?.phone ?? "");
 
-  const pdfEnabled = Boolean(useSettings().invoice.enablePdf);
+  const can = useCan();
+  const pdfEnabled = Boolean(useSettings().invoice.enablePdf) && can("sales.share");
   const [sending, setSending] = useState(false);
 
   // Payment state lives here so it can change while the invoice is open (QR payments arrive later).
   const [paid, setPaid] = useState<number>(invoice.amountPaid);
   const [onlineGateways, setOnlineGateways] = useState<string[]>([]);
   const [waiting, setWaiting] = useState(false);
-  const [showPanel] = useState(() => invoice.total - invoice.amountPaid > 0.001);
+  const [showPanel] = useState(() => invoice.total - invoice.amountPaid > 0.001 && can("sales.online_payment"));
   const methods = [
     ...new Set([
       ...((invoice.payments ?? []) as { method: string }[]).map((p) => p.method),

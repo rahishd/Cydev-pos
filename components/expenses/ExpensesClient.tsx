@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Drawer } from "@/components/ui/Drawer";
+import { useCan } from "@/components/providers/SettingsProvider";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { FileInput } from "@/components/ui/FileInput";
@@ -72,6 +73,7 @@ export default function ExpensesClient({
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
+  const canExport = useCan()("expenses.export");
 
   // Filters
   const [search, setSearch] = useState("");
@@ -387,13 +389,15 @@ export default function ExpensesClient({
               </Select>
             </div>
 
-            <Button
-              variant="ghost"
-              onClick={handleReportClick}
-              className="px-4 py-2 rounded-lg font-medium text-sm"
-            >
-              Report (PDF)
-            </Button>
+            {canExport && (
+              <Button
+                variant="ghost"
+                onClick={handleReportClick}
+                className="px-4 py-2 rounded-lg font-medium text-sm"
+              >
+                Report (PDF)
+              </Button>
+            )}
 
             <Button
               onClick={handleAddClick}
@@ -524,12 +528,14 @@ export default function ExpensesClient({
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => setShareTarget({ kind: "voucher", expense })}
-                        className="text-orange-600 hover:text-orange-700 text-sm font-medium"
-                      >
-                        Share
-                      </button>
+                      {canExport && (
+                        <button
+                          onClick={() => setShareTarget({ kind: "voucher", expense })}
+                          className="text-orange-600 hover:text-orange-700 text-sm font-medium"
+                        >
+                          Share
+                        </button>
+                      )}
                       <button
                         onClick={() => handleEditClick(expense)}
                         className="text-blue-600 hover:text-blue-700 text-sm font-medium"

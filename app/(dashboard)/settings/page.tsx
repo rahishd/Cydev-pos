@@ -10,7 +10,8 @@ export default async function SettingsPage() {
     "settings.payment",
     "settings.invoice",
     "settings.inventory",
-    "settings.system"
+    "settings.system",
+    "data.export"
   );
   const data = await getSettingsPageData();
   return <SettingsClient data={data} />;

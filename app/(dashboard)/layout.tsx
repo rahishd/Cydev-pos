@@ -19,7 +19,7 @@ export default async function DashboardLayout({
   const settings = await getSettings();
 
   return (
-    <SettingsProvider settings={settings}>
+    <SettingsProvider settings={settings} access={{ isOwner: access.isOwner, permissions: access.permissions }}>
     <div className="flex min-h-screen">
       <PaymentNotifier />
       <Sidebar

@@ -13,7 +13,7 @@ async function login(formData: FormData) {
   "use server";
   try {
     await signIn("credentials", {
-      userId: formData.get("userId"),
+      identifier: formData.get("identifier"),
       password: formData.get("password"),
       redirectTo: "/home",
     });
@@ -47,8 +47,8 @@ export default async function LoginPage({
 
         <form action={login} className="space-y-4">
           <div>
-            <Label htmlFor="userId">User ID</Label>
-            <Input id="userId" name="userId" type="text" placeholder="e.g. U001" autoComplete="username" autoCapitalize="characters" required autoFocus />
+            <Label htmlFor="identifier">Contact number</Label>
+            <Input id="identifier" name="identifier" type="text" inputMode="text" placeholder="98XXXXXXXX (or your User ID)" autoComplete="username" required autoFocus />
           </div>
           <div>
             <Label htmlFor="password">Password</Label>
@@ -59,7 +59,7 @@ export default async function LoginPage({
             <p className="text-sm text-danger">
               {error === "locked"
                 ? "Too many wrong attempts. This account is locked for a while. Please try again later or ask the Owner."
-                : "Invalid User ID or password."}
+                : "Invalid contact number or password."}
             </p>
           )}
 

@@ -24,6 +24,7 @@ import {
 } from "@/app/(dashboard)/users/actions";
 import { PERMISSION_GROUPS } from "@/lib/permissions";
 import { generatePassword } from "@/lib/password";
+import { normalizePhone } from "@/lib/phone";
 import { useSettings } from "@/components/providers/SettingsProvider";
 import { SHOP_INFO } from "@/lib/shop-info";
 
@@ -50,7 +51,7 @@ function StatTile({ label, value }: { label: string; value: number }) {
   );
 }
 
-type Credentials = { userId: string; password: string; name: string; id?: string; isNew?: boolean };
+type Credentials = { userId: string; password: string; name: string; contact?: string; id?: string; isNew?: boolean };
 
 export function UsersClient({ data }: { data: UsersPageData }) {
   const router = useRouter();
@@ -155,7 +156,7 @@ export function UsersClient({ data }: { data: UsersPageData }) {
           status: fStatus,
         });
         setFormOpen(false);
-        setCreds({ userId: res.userId, password: res.password, name: fName.trim(), id: res.id, isNew: true });
+        setCreds({ userId: res.userId, password: res.password, name: fName.trim(), contact: fContact.trim(), id: res.id, isNew: true });
       }
       router.refresh();
     } catch (e) {
@@ -187,7 +188,7 @@ export function UsersClient({ data }: { data: UsersPageData }) {
     setResetError("");
     try {
       const res = await setStaffPassword(resetFor.id, resetPw);
-      setCreds({ userId: res.userId, password: res.password, name: resetFor.name });
+      setCreds({ userId: res.userId, password: res.password, name: resetFor.name, contact: resetFor.contactNumber ?? "" });
       setResetFor(null);
       router.refresh();
     } catch (e) {
@@ -241,7 +242,9 @@ export function UsersClient({ data }: { data: UsersPageData }) {
 
   const copyCredentials = async () => {
     if (!creds) return;
-    const text = `${SHOP_INFO.name}\nUser ID: ${creds.userId}\nPassword: ${creds.password}`;
+    const text = creds.contact
+      ? `${SHOP_INFO.name}\nSign in with contact number: ${creds.contact}\nPassword: ${creds.password}`
+      : `${SHOP_INFO.name}\nUser ID: ${creds.userId}\nPassword: ${creds.password}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -251,9 +254,12 @@ export function UsersClient({ data }: { data: UsersPageData }) {
     }
   };
 
+  const contactOk = normalizePhone(fContact) !== "";
   const formValid =
     fName.trim().length > 0 &&
-    (editing || (fUserId.trim().length >= 3 && fPassword.length >= MIN_PASSWORD_LENGTH));
+    (editing
+      ? contactOk || !editing.contactNumber
+      : contactOk && fUserId.trim().length >= 3 && fPassword.length >= MIN_PASSWORD_LENGTH);
 
   return (
     <div className="space-y-4">
@@ -273,6 +279,18 @@ export function UsersClient({ data }: { data: UsersPageData }) {
         <StatTile label="Inactive" value={data.stats.inactive} />
         <StatTile label="Staff" value={data.stats.staff} />
       </div>
+
+      {data.users.some((u) => u.status === "ACTIVE" && !normalizePhone(u.contactNumber)) && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <b>Add a contact number</b> so these accounts can sign in with it (they can still sign in with their User ID
+          until then):{" "}
+          {data.users
+            .filter((u) => u.status === "ACTIVE" && !normalizePhone(u.contactNumber))
+            .map((u) => `${u.name} (${u.userId})`)
+            .join(", ")}
+          . Use <b>Edit</b> on their row.
+        </div>
+      )}
 
       <Card className="flex flex-col gap-3 sm:flex-row">
         <Input
@@ -397,7 +415,7 @@ export function UsersClient({ data }: { data: UsersPageData }) {
             <Input value={fName} onChange={(e) => setFName(e.target.value)} placeholder="Ram Kumar" />
           </div>
           <div>
-            <Label>Contact Number</Label>
+            <Label>Contact Number *</Label>
             <Input
               type="tel"
               value={fContact}
@@ -405,7 +423,7 @@ export function UsersClient({ data }: { data: UsersPageData }) {
               placeholder="98XXXXXXXX"
             />
             <p className="mt-1 text-xs text-text-muted">
-              For your reference only. It is not used to sign in.
+              This is how they sign in (with their password). Each number can only be used by one person.
             </p>
           </div>
 
@@ -418,7 +436,7 @@ export function UsersClient({ data }: { data: UsersPageData }) {
           ) : (
             <>
               <div>
-                <Label>User ID *</Label>
+                <Label>User ID * (internal ID, optional for sign-in)</Label>
                 <div className="flex gap-2">
                   <Input
                     value={fUserId}
@@ -502,8 +520,8 @@ export function UsersClient({ data }: { data: UsersPageData }) {
             <div className="rounded-md border border-border bg-zinc-50 p-3 text-sm">
               <div className="mb-2 text-text-muted">{creds.name}</div>
               <div className="flex justify-between">
-                <span className="text-text-muted">User ID</span>
-                <span className="font-mono font-semibold">{creds.userId}</span>
+                <span className="text-text-muted">{creds.contact ? "Sign in with (contact number)" : "User ID"}</span>
+                <span className="font-mono font-semibold">{creds.contact || creds.userId}</span>
               </div>
               <div className="mt-1 flex justify-between">
                 <span className="text-text-muted">Password</span>

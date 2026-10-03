@@ -134,10 +134,10 @@ export function PushPanel() {
 
   return (
     <div className="rounded-md border border-border p-4">
-      <div className="mb-1 text-sm font-semibold text-text">Phone notifications (Owner)</div>
+      <div className="mb-1 text-sm font-semibold text-text">Phone notifications</div>
       <p className="mb-3 text-xs text-text-muted">
-        Get a notification on this phone, even when it&apos;s locked, whenever staff make a sale, take a payment, process a
-        return or change stock. Choose what to be told about with the switches below.
+        Get a notification on this phone, even when it&apos;s locked, when sales are made, payments come in, returns are
+        processed or stock changes. You only hear about areas you have access to, and never about what you did yourself.
       </p>
 
       {!env.secure ? (

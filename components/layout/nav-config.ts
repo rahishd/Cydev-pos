@@ -32,7 +32,8 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "reports", label: "Reports", href: "#", icon: "reports", enabled: false, prefix: "reports" },
   { id: "users", label: "Users", href: "/users", icon: "users", enabled: true, ownerOnly: true },
   { id: "audit", label: "Audit Log", href: "/audit-log", icon: "audit", enabled: true, anyOf: ["audit.view"] },
-  { id: "settings", label: "Settings", href: "/settings", icon: "settings", enabled: true, prefix: "settings" },
+  { id: "notifications", label: "Notifications", href: "/notifications", icon: "bell", enabled: true, anyOf: ["notifications.push"] },
+  { id: "settings", label: "Settings", href: "/settings", icon: "settings", enabled: true, prefix: "settings", anyOf: ["data.export"] },
 ];
 
 export type Gate = Pick<NavItem, "anyOf" | "prefix" | "ownerOnly">;
@@ -40,9 +41,10 @@ export type Gate = Pick<NavItem, "anyOf" | "prefix" | "ownerOnly">;
 export function canSee(item: Gate, isOwner: boolean, permissions: string[]): boolean {
   if (isOwner) return true;
   if (item.ownerOnly) return false;
-  if (item.anyOf) return item.anyOf.some((p) => permissions.includes(p));
-  if (item.prefix) return permissions.some((p) => p.startsWith(item.prefix + "."));
-  return true;
+  if (!item.anyOf && !item.prefix) return true;
+  if (item.anyOf?.some((p) => permissions.includes(p))) return true;
+  if (item.prefix && permissions.some((p) => p.startsWith(item.prefix + "."))) return true;
+  return false;
 }
 
 export type Tile = Gate & { label: string; href: string; icon: IconName };
@@ -68,7 +70,7 @@ export const HOME_GROUPS: TileGroup[] = [
   },
   { title: "Stock & Purchases", tiles: [byId("products"), byId("inventory"), byId("purchases")] },
   { title: "Money", tiles: [byId("expenses")] },
-  { title: "Administration", tiles: [byId("users"), byId("audit"), byId("settings")] },
+  { title: "Administration", tiles: [byId("users"), byId("audit"), byId("notifications"), byId("settings")] },
 ];
 
 export function pageTitle(pathname: string): string {

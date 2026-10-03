@@ -359,14 +359,14 @@ async function appOrigin() {
 }
 
 export async function getExpenseShareUrl(id: string) {
-  await assertPermission("expenses.view");
+  await assertPermission("expenses.export");
   const session = await auth();
   if (!session) throw new Error("Unauthorized");
   return `${await appOrigin()}/api/expense/${id}?t=${expenseToken(id)}`;
 }
 
 export async function getExpenseReportShareUrl(filters: ExpenseReportFilters) {
-  await assertPermission("expenses.view");
+  await assertPermission("expenses.export");
   const session = await auth();
   if (!session) throw new Error("Unauthorized");
   const f = {

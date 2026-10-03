@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
 import { logAudit } from "@/lib/audit";
+import { findLoginUser } from "@/lib/login-lookup";
+import { maskPhone } from "@/lib/phone";
 import type { Role } from "@prisma/client";
 
 class AccountLocked extends CredentialsSignin {
@@ -37,15 +39,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        userId: { label: "User ID", type: "text" },
+        identifier: { label: "Contact number or User ID", type: "text" },
         password: { label: "Password", type: "password" },
       },
       authorize: async (credentials) => {
-        const loginId = (credentials?.userId as string | undefined)?.trim().toUpperCase();
+        const typed = (credentials?.identifier as string | undefined)?.trim();
         const password = credentials?.password as string | undefined;
-        if (!loginId || !password) return null;
+        if (!typed || !password) return null;
+        // Numbers are masked in the log so a phone number never sits there in full.
+        const loginId = /^[+\d\s()-]+$/.test(typed) ? maskPhone(typed) : typed.toUpperCase();
 
-        const user = await prisma.user.findUnique({ where: { userId: loginId } });
+        const user = await findLoginUser(typed);
         const failed = (actor: Parameters<typeof logAudit>[0]["actor"], reason: string) =>
           logAudit({
             actor,
@@ -59,7 +63,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
 
         if (!user) {
-          await failed({ userId: loginId }, "Unknown User ID");
+          await failed({ userId: loginId }, "Unknown contact number or User ID");
           return null;
         }
         const actor = { id: user.id, userId: user.userId, name: user.name, role: user.role };

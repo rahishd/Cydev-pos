@@ -16,6 +16,9 @@ export type SettingsPageData = {
   settings: SettingsValues;
   sections: SettingsSectionId[];
   isOwner: boolean;
+  canPush: boolean;
+  /** Which CSV exports this person may download (full backup is Owner-only). */
+  exportKinds: string[];
 };
 
 /** Sections the signed-in user may open: the Owner sees all, staff only those granted. */
@@ -28,7 +31,25 @@ export async function getSettingsPageData(): Promise<SettingsPageData> {
   if (!access) throw new Error("Please sign in again.");
   const sections = visibleSections(access.can);
   if (sections.length === 0) throw new Error("You don't have access to Settings.");
-  return { settings: await getSettings(), sections, isOwner: access.isOwner };
+  const exportKinds = access.can("data.export")
+    ? (
+        [
+          ["products", "products.view"],
+          ["sales", "sales.history"],
+          ["customers", "customers.view"],
+          ["expenses", "expenses.view"],
+        ] as const
+      )
+        .filter(([, perm]) => access.can(perm))
+        .map(([kind]) => kind)
+    : [];
+  return {
+    settings: await getSettings(),
+    sections,
+    isOwner: access.isOwner,
+    canPush: access.can("notifications.push"),
+    exportKinds,
+  };
 }
 
 function sectionById(id: string) {

@@ -217,7 +217,7 @@ export function SettingsClient({ data }: { data: SettingsPageData }) {
           <p className="mb-4 text-sm text-text-muted">{section.description}</p>
 
           <div className="space-y-4">
-            {section.custom === "push" && data.isOwner && <PushPanel />}
+            {section.custom === "push" && data.canPush && <PushPanel />}
             {section.custom === "logo" && <LogoPanel key={String(data.settings.business.logo ?? "")} logo={data.settings.business.logo} />}
             <SectionForm
               key={section.id + JSON.stringify(data.settings[section.id])}
@@ -225,7 +225,7 @@ export function SettingsClient({ data }: { data: SettingsPageData }) {
               initial={data.settings[section.id]}
             />
             {section.custom === "expenseCategories" && <ExpenseCategoriesPanel />}
-            {section.custom === "backup" && <BackupPanel isOwner={data.isOwner} />}
+            {section.custom === "backup" && <BackupPanel isOwner={data.isOwner} exportKinds={data.exportKinds} />}
           </div>
         </Card>
       </div>

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { assertOwner } from "@/lib/access";
 import { DEFAULT_STAFF_PERMISSIONS, sanitizePermissions } from "@/lib/permissions";
 import { passwordProblem } from "@/lib/password";
+import { normalizePhone } from "@/lib/phone";
 import { getSettings } from "@/lib/settings";
 import { logAudit } from "@/lib/audit";
 import { PERMISSION_GROUPS } from "@/lib/permissions";
@@ -52,6 +53,18 @@ async function nextUserId(): Promise<string> {
     if (m) max = Math.max(max, parseInt(m[1], 10));
   }
   return "U" + String(max + 1).padStart(3, "0");
+}
+
+/** Validates a sign-in number and makes sure nobody else already uses it. */
+async function signInPhone(contact: string | undefined, excludingId?: string): Promise<string> {
+  const phone = normalizePhone(contact);
+  if (!phone) throw new Error("Enter a valid contact number (at least 7 digits). It is used to sign in.");
+  const clash = await prisma.user.findFirst({
+    where: { loginPhone: phone, ...(excludingId ? { id: { not: excludingId } } : {}) },
+    select: { name: true, userId: true },
+  });
+  if (clash) throw new Error(`That contact number is already used by ${clash.name} (${clash.userId}).`);
+  return phone;
 }
 
 async function activeOwnerCount(excludingId?: string) {
@@ -120,6 +133,7 @@ export async function createStaff(input: {
   if (await prisma.user.findUnique({ where: { userId } })) {
     throw new Error(`User ID ${userId} is already taken`);
   }
+  const loginPhone = await signInPhone(input.contactNumber);
 
   const permissions = input.role === "OWNER" ? [] : DEFAULT_STAFF_PERMISSIONS;
   const user = await prisma.user.create({
@@ -127,6 +141,7 @@ export async function createStaff(input: {
       userId,
       name,
       contactNumber: input.contactNumber?.trim() || null,
+      loginPhone,
       passwordHash: await bcrypt.hash(input.password, 10),
       role: input.role,
       status: input.status,
@@ -148,7 +163,7 @@ export async function createStaff(input: {
   });
 
   revalidatePath("/users");
-  return { id: user.id, userId, password: input.password };
+  return { id: user.id, userId, password: input.password, contactNumber: input.contactNumber?.trim() ?? "" };
 }
 
 export async function updateStaff(input: {
@@ -171,11 +186,18 @@ export async function updateStaff(input: {
     }
   }
 
+  const wantsBlank = !input.contactNumber?.trim();
+  if (wantsBlank && existing.loginPhone) {
+    throw new Error("A contact number is required. It is how this person signs in.");
+  }
+  const loginPhone = wantsBlank ? null : await signInPhone(input.contactNumber, existing.id);
+
   await prisma.user.update({
     where: { id: input.id },
     data: {
       name,
       contactNumber: input.contactNumber?.trim() || null,
+      loginPhone,
       role: input.role,
       ...(input.role === "OWNER" ? { permissions: [] } : {}),
     },

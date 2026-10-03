@@ -22,7 +22,8 @@ export type IconName =
   | "eyeOff"
   | "logout"
   | "back"
-  | "close";
+  | "close"
+  | "bell";
 
 const PATHS: Record<IconName, ReactNode> = {
   home: (
@@ -166,6 +167,12 @@ const PATHS: Record<IconName, ReactNode> = {
   ),
   back: <path d="M15 18l-6-6 6-6" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
+  bell: (
+    <>
+      <path d="M6 9a6 6 0 0112 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z" />
+      <path d="M10 20a2 2 0 004 0" />
+    </>
+  ),
 };
 
 export function Icon({ name, className = "h-6 w-6" }: { name: IconName; className?: string }) {

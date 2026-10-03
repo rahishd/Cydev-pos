@@ -28,9 +28,23 @@ const file = (body: string, name: string, type: string) =>
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ kind: string }> }) {
   const access = await getAccess();
-  if (!access?.isOwner) return new NextResponse("Forbidden", { status: 403 });
+  if (!access) return new NextResponse("Forbidden", { status: 403 });
 
   const { kind } = await params;
+  const needs: Record<string, string> = {
+    products: "products.view",
+    sales: "sales.history",
+    customers: "customers.view",
+    expenses: "expenses.view",
+  };
+  if (kind === "full") {
+    if (!access.isOwner) return new NextResponse("Forbidden", { status: 403 });
+  } else if (needs[kind]) {
+    if (!access.isOwner && !(access.can("data.export") && access.can(needs[kind]))) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+  }
+
   const stamp = new Date().toISOString().slice(0, 10);
   if (kind === "full" || ["products", "sales", "customers", "expenses"].includes(kind)) {
     await logAudit({

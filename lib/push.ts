@@ -53,19 +53,46 @@ export async function pushToUser(userId: string, payload: PushPayload): Promise<
   return deliver(subs, payload);
 }
 
-/** Every active Owner's subscribed phones, except the person who did the action themselves. */
-export async function pushToOwners(payload: PushPayload, exceptUserId?: string | null): Promise<PushResult> {
-  if (!configure()) return { sent: 0, failed: 0, removed: 0 };
-  const owners = await prisma.user.findMany({
-    where: { role: "OWNER", status: "ACTIVE", ...(exceptUserId ? { id: { not: exceptUserId } } : {}) },
-    select: { id: true },
-  });
-  if (owners.length === 0) return { sent: 0, failed: 0, removed: 0 };
-  const subs = await prisma.pushSubscription.findMany({ where: { userId: { in: owners.map((o) => o.id) } } });
-  return deliver(subs, payload);
+type Category = "pushSales" | "pushPayments" | "pushReturns" | "pushStock" | "pushSecurity";
+
+/** Staff only hear about areas they can already see; security alerts are Owner-only. */
+export const CATEGORY_NEEDS: Record<Category, string[]> = {
+  pushSales: ["sales.history"],
+  pushPayments: ["sales.history", "sales.online_payment"],
+  pushReturns: ["sales.return", "sales.exchange"],
+  pushStock: ["inventory.history", "inventory.view"],
+  pushSecurity: [],
+};
+
+export function wantsCategory(
+  user: { role: string; permissions: string[] },
+  category: Category
+): boolean {
+  if (user.role === "OWNER") return true;
+  if (!user.permissions.includes("notifications.push")) return false;
+  return CATEGORY_NEEDS[category].some((p) => user.permissions.includes(p));
 }
 
-type Category = "pushSales" | "pushPayments" | "pushReturns" | "pushStock" | "pushSecurity";
+/** Owners, plus staff holding the notifications permission and access to that area. Never the person who acted. */
+export async function pushToRecipients(
+  category: Category,
+  payload: PushPayload,
+  exceptUserId?: string | null
+): Promise<PushResult> {
+  if (!configure()) return { sent: 0, failed: 0, removed: 0 };
+  const users = await prisma.user.findMany({
+    where: {
+      status: "ACTIVE",
+      OR: [{ role: "OWNER" }, { permissions: { has: "notifications.push" } }],
+      ...(exceptUserId ? { id: { not: exceptUserId } } : {}),
+    },
+    select: { id: true, role: true, permissions: true },
+  });
+  const ids = users.filter((u) => wantsCategory(u, category)).map((u) => u.id);
+  if (ids.length === 0) return { sent: 0, failed: 0, removed: 0 };
+  const subs = await prisma.pushSubscription.findMany({ where: { userId: { in: ids } } });
+  return deliver(subs, payload);
+}
 
 /** Decides whether an audit event deserves a phone notification, and which Settings switch controls it. */
 export function classify(e: {
@@ -100,7 +127,8 @@ export async function notifyOwnersOfEvent(e: {
   if (!settings.notifications[hit.category]) return;
 
   const who = e.actor?.name ? `${e.actor.name}${e.actor.userId ? ` (${e.actor.userId})` : ""}` : "Customer";
-  await pushToOwners(
+  await pushToRecipients(
+    hit.category,
     {
       title: e.title || String(settings.business.shopName),
       body: `${who}: ${e.description}`.slice(0, 180),

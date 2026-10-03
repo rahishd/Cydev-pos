@@ -13,7 +13,7 @@ export type OnlineGateway = { id: string; label: string };
 
 /** Khalti, eSewa and Fonepay when QR payments are on; nothing when they are off. */
 export async function getOnlineGateways(): Promise<OnlineGateway[]> {
-  await assertPermission("sales.create");
+  await assertPermission("sales.online_payment");
   if (!(await getSettings()).payments.demoQr) return [];
   return Object.entries(GATEWAYS).map(([id, g]) => ({ id, label: g.label }));
 }
@@ -35,7 +35,7 @@ async function origin() {
 }
 
 export async function createPaymentRequest(gateway: string, amount: number, saleId?: string) {
-  const access = await assertPermission("sales.create");
+  const access = await assertPermission("sales.online_payment");
   const settings = await getSettings();
 
   if (!settings.payments.demoQr) throw new Error("QR payments are turned off in Settings.");
@@ -72,7 +72,7 @@ export async function createPaymentRequest(gateway: string, amount: number, sale
 }
 
 export async function cancelPaymentRequest(id: string) {
-  const access = await assertPermission("sales.create");
+  const access = await assertPermission("sales.online_payment");
   await prisma.paymentRequest.updateMany({
     where: { id, status: "PENDING", createdById: access.id },
     data: { status: "CANCELLED" },
@@ -81,7 +81,7 @@ export async function cancelPaymentRequest(id: string) {
 
 /** Records a customer-confirmed QR payment against the invoice it was collected for. */
 export async function applyOnlinePayment(saleId: string, paymentRequestId: string) {
-  const access = await assertPermission("sales.create");
+  const access = await assertPermission("sales.online_payment");
 
   const [sale, pr] = await Promise.all([
     prisma.sale.findUnique({ where: { id: saleId }, select: { invoiceNo: true, total: true, amountPaid: true } }),

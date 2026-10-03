@@ -12,6 +12,7 @@ model User {
   userId         String          @unique
   name           String
   contactNumber  String?
+  loginPhone     String?         @unique
   email          String?         @unique
   passwordHash   String
   permissions    String[]        @default([])

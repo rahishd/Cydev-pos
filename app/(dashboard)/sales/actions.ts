@@ -765,7 +765,7 @@ export async function recordAdditionalPayment(saleId: string, amount: number, me
 export async function getInvoiceShareUrl(saleId: string) {
   const invoiceSettings = (await getSettings()).invoice;
   if (!invoiceSettings.enablePdf) throw new Error("PDF invoices are turned off in Settings.");
-  const access = await assertPermission("sales.history", "sales.create");
+  const access = await assertPermission("sales.share");
   const session = await auth();
   if (!session) throw new Error("Unauthorized");
   const shared = await prisma.sale.findUnique({ where: { id: saleId }, select: { invoiceNo: true } });

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Card } from "@/components/ui/Card";
 import { formatCurrency } from "@/lib/date-utils";
-import { useSettings } from "@/components/providers/SettingsProvider";
+import { useCan, useSettings } from "@/components/providers/SettingsProvider";
 import { searchCustomersByNameOrPhone } from "@/app/(dashboard)/sales/actions";
 
 type Customer = {
@@ -37,6 +37,7 @@ export function PaymentModal({
   onComplete: (data: any) => void;
 }) {
   const settings = useSettings();
+  const can = useCan();
   const enabledMethods: Record<string, boolean> = {
     CASH: Boolean(settings.payments.cash),
     ESEWA: Boolean(settings.payments.esewa),
@@ -46,7 +47,7 @@ export function PaymentModal({
     CARD: Boolean(settings.payments.card),
   };
   // With QR payments on, the list is simply Cash or Online (QR); the gateway is chosen on the invoice.
-  const qrAvailable = Boolean(settings.payments.demoQr);
+  const qrAvailable = Boolean(settings.payments.demoQr) && can("sales.online_payment");
   const preferred = String(settings.sales.defaultPaymentMethod);
   const defaultMethod = qrAvailable
     ? enabledMethods.CASH

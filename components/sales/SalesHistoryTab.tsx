@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { formatCurrency } from "@/lib/date-utils";
-import { useSettings } from "@/components/providers/SettingsProvider";
+import { useCan, useSettings } from "@/components/providers/SettingsProvider";
 import { OnlinePayPanel } from "@/components/sales/OnlinePaymentFlow";
 import {
   downloadInvoicePdf,
@@ -47,7 +47,8 @@ export function SalesHistoryTab({
   const [selectedSale, setSelectedSale] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
   const invoiceSettings = useSettings().invoice;
-  const pdfEnabled = Boolean(invoiceSettings.enablePdf && invoiceSettings.enableReprint);
+  const can = useCan();
+  const pdfEnabled = Boolean(invoiceSettings.enablePdf && invoiceSettings.enableReprint) && can("sales.share");
   const [contact, setContact] = useState("");
   const [panelSale, setPanelSale] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
@@ -78,7 +79,7 @@ export function SalesHistoryTab({
     try {
       const details = await getSaleDetails(saleId);
       setSelectedSale(details);
-      setPanelSale(details?.outstanding > 0.001 ? saleId : null);
+      setPanelSale(details?.outstanding > 0.001 && can("sales.online_payment") ? saleId : null);
       setWaiting(false);
       setContact(details?.sale?.customer?.phone ?? "");
       setShowDetails(true);

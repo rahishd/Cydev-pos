@@ -209,25 +209,26 @@ export function ExpenseCategoriesPanel() {
 
 // ---------- Backup ----------
 
-export function BackupPanel({ isOwner }: { isOwner: boolean }) {
+export function BackupPanel({ isOwner, exportKinds }: { isOwner: boolean; exportKinds: string[] }) {
   const [info, setInfo] = useState<Awaited<ReturnType<typeof getBackupInfo>> | null>(null);
   useEffect(() => {
     if (isOwner) getBackupInfo().then(setInfo).catch(() => setInfo(null));
   }, [isOwner]);
-
-  if (!isOwner) {
-    return <p className="text-sm text-text-muted">Only the Owner can download or manage backups.</p>;
-  }
 
   const exports = [
     { kind: "products", label: "Products & stock (CSV)" },
     { kind: "sales", label: "Sales (CSV)" },
     { kind: "customers", label: "Customers (CSV)" },
     { kind: "expenses", label: "Expenses (CSV)" },
-  ];
+  ].filter((e) => exportKinds.includes(e.kind));
+
+  if (!isOwner && exports.length === 0) {
+    return <p className="text-sm text-text-muted">You don't have any data you're allowed to export.</p>;
+  }
 
   return (
     <div className="space-y-4">
+      {isOwner && (
       <div className="rounded-md border border-border p-4">
         <div className="mb-1 text-sm font-semibold text-text">Full backup</div>
         <p className="mb-3 text-xs text-text-muted">
@@ -241,6 +242,7 @@ export function BackupPanel({ isOwner }: { isOwner: boolean }) {
           <Button type="button">Download full backup</Button>
         </a>
       </div>
+      )}
 
       <div className="rounded-md border border-border p-4">
         <div className="mb-2 text-sm font-semibold text-text">Export for Excel</div>
@@ -253,12 +255,14 @@ export function BackupPanel({ isOwner }: { isOwner: boolean }) {
         </div>
       </div>
 
+      {isOwner && (
       <div className="rounded-md border border-border bg-zinc-50 p-4 text-xs text-text-muted">
         <div className="mb-1 text-sm font-semibold text-text">Restore &amp; import</div>
         Restoring a backup is deliberately not a button here, because a wrong restore could overwrite live sales.
         Your database is hosted on Neon, which keeps point-in-time history: restore from the Neon console (Branches /
         Restore) or ask your developer to import the JSON file.
       </div>
+      )}
     </div>
   );
 }
