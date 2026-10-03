@@ -301,6 +301,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { key: "card", label: "Card", type: "toggle", default: true, applied: true },
       { key: "bankTransfer", label: "Bank Transfer", type: "toggle", default: true, applied: true },
       { key: "credit", label: "Credit", type: "toggle", default: false, applied: true },
+      {
+        key: "demoQr",
+        label: "Online QR payment (demo)",
+        type: "toggle",
+        default: true,
+        applied: true,
+        help: "SIMULATION ONLY: the cashier shows a QR, the customer taps Confirm on a demo page, and the sale is marked paid. No money moves and nothing is checked with eSewa or Khalti, so turn this off before real use.",
+      },
     ],
   },
   {

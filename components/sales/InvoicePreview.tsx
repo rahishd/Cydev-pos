@@ -6,6 +6,8 @@ import { getInvoiceShareUrl } from "@/app/(dashboard)/sales/actions";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { OnlinePayPanel } from "@/components/sales/OnlinePaymentFlow";
+import { GATEWAYS, isGateway } from "@/lib/online-pay";
 import { formatCurrency } from "@/lib/date-utils";
 import {
   downloadInvoicePdf,
@@ -28,6 +30,21 @@ export function InvoicePreview({
   const pdfEnabled = Boolean(useSettings().invoice.enablePdf);
   const [sending, setSending] = useState(false);
 
+  // Payment state lives here so it can change while the invoice is open (QR payments arrive later).
+  const [paid, setPaid] = useState<number>(invoice.amountPaid);
+  const [onlineGateways, setOnlineGateways] = useState<string[]>([]);
+  const [waiting, setWaiting] = useState(false);
+  const [showPanel] = useState(() => invoice.total - invoice.amountPaid > 0.001);
+  const methods = [
+    ...new Set([
+      ...((invoice.payments ?? []) as { method: string }[]).map((p) => p.method),
+      ...onlineGateways,
+    ]),
+  ];
+  const methodText = methods.length
+    ? methods.map((m) => (isGateway(m) ? GATEWAYS[m].label : m.replace(/_/g, " "))).join(", ")
+    : invoice.method || "-";
+
   const pdfData = (): InvoiceData => ({
     invoiceNo: invoice.invoiceNo,
     date: invoice.createdAt,
@@ -48,10 +65,8 @@ export function InvoicePreview({
     discount: invoice.discount,
     tax: invoice.tax,
     total: invoice.total,
-    paid: invoice.amountPaid,
-    method: invoice.payments
-      ? Array.from(new Set(invoice.payments.map((p: any) => p.method))).join(", ")
-      : invoice.method,
+    paid,
+    method: methods.join(", ") || invoice.method,
   });
 
   const validContact = normalizeWhatsAppNumber(contact).length >= 11;
@@ -66,14 +81,16 @@ export function InvoicePreview({
     }
   };
 
-  const outstanding = invoice.total - invoice.amountPaid;
+  const outstanding = invoice.total - paid;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Invoice #${invoice.invoiceNo}`} size="lg">
       <div className="space-y-4 max-h-[70vh] overflow-y-auto">
         {/* Success Message */}
-        <div className="p-3 bg-green-50 border border-success/20 rounded text-center">
-          <div className="text-sm font-semibold text-success">Sale Completed ✓</div>
+        <div className={`p-3 border rounded text-center ${outstanding > 0.001 ? "bg-amber-50 border-amber-300" : "bg-green-50 border-success/20"}`}>
+          <div className={`text-sm font-semibold ${outstanding > 0.001 ? "text-amber-700" : "text-success"}`}>
+            {outstanding > 0.001 ? "Sale created: payment pending" : "Sale Completed ✓"}
+          </div>
           <div className="text-xs text-text-muted mt-1">Invoice #{invoice.invoiceNo}</div>
         </div>
 
@@ -163,11 +180,11 @@ export function InvoicePreview({
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-text-muted">Payment Method</span>
-              <span className="font-medium">{invoice.method}</span>
+              <span className="font-medium">{methodText}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-text-muted">Paid</span>
-              <span className="font-medium">NPR {formatCurrency(invoice.amountPaid)}</span>
+              <span className="font-medium">NPR {formatCurrency(paid)}</span>
             </div>
             {outstanding !== 0 && (
               <div className="flex justify-between border-t border-border pt-2">
@@ -181,6 +198,20 @@ export function InvoicePreview({
             )}
           </div>
         </Card>
+
+        {/* Online (QR) payment for whatever is still due */}
+        {showPanel && (
+          <OnlinePayPanel
+            saleId={invoice.id}
+            amount={Math.max(0.01, outstanding)}
+            autoStart={(invoice.pendingOnline ?? 0) > 0}
+            onWaitingChange={setWaiting}
+            onPaid={({ gateway, applied }) => {
+              setPaid((p) => p + applied);
+              setOnlineGateways((g) => [...g, gateway]);
+            }}
+          />
+        )}
 
         {/* WhatsApp */}
         {pdfEnabled && (
@@ -196,8 +227,8 @@ export function InvoicePreview({
               placeholder="98XXXXXXXX"
               className="flex-1 px-2 py-1.5 text-sm border border-border rounded"
             />
-            <Button onClick={handleWhatsApp} disabled={!validContact || sending}>
-              {sending ? "Opening..." : "Send Invoice via WhatsApp"}
+            <Button onClick={handleWhatsApp} disabled={!validContact || sending || waiting}>
+              {waiting ? "Waiting for payment..." : sending ? "Opening..." : "Send Invoice via WhatsApp"}
             </Button>
           </div>
         </Card>
@@ -210,7 +241,7 @@ export function InvoicePreview({
               Download PDF
             </Button>
           )}
-          <Button onClick={onClose} className="flex-1">
+          <Button onClick={onClose} className="flex-1" disabled={waiting}>
             New Sale
           </Button>
         </div>

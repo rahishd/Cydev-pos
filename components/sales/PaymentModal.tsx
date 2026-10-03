@@ -132,21 +132,45 @@ export function PaymentModal({
       }
     }
 
+    const qrParts = payments.filter((p) => p.method === "ONLINE_QR");
+    if (qrParts.length > 1) {
+      alert("Please use only one online (QR) payment per sale.");
+      return;
+    }
+    if (qrParts.length === 1) {
+      if (qrParts[0].amount <= 0) {
+        alert("Enter the amount to collect online.");
+        return;
+      }
+      // The sale is created now with the online part still unpaid; its QR appears on the invoice.
+      finish(
+        payments.filter((p) => p.method !== "ONLINE_QR"),
+        qrParts[0].amount
+      );
+      return;
+    }
+
+    finish(payments);
+  };
+
+  const finish = (list: PaymentPart[], pendingOnline = 0) => {
     onComplete({
-      payments,
-      amountPaid: Math.min(totalPaid, total),
+      payments: list,
+      pendingOnline,
+      amountPaid: Math.min(list.reduce((sum, p) => sum + p.amount, 0), total),
       deliveryMethod,
       deliveryAddress: deliveryMethod === "COD" ? deliveryAddress : undefined,
       deliveryPhone: deliveryMethod === "COD" ? deliveryPhone : undefined,
       customerName: customerName.trim() || undefined,
       customerPhone: customerPhone.trim() || undefined,
-      dueDate: payments.some((p) => p.method === "CREDIT")
+      dueDate: list.some((p) => p.method === "CREDIT")
         ? new Date(dueDate)
         : undefined,
     });
   };
 
   return (
+    <>
     <Modal isOpen={isOpen} onClose={onClose} title="Payment & Delivery" size="md">
       <div className="space-y-4 max-h-[80vh] overflow-y-auto">
         <Card className="bg-zinc-50 p-3">
@@ -292,6 +316,10 @@ export function PaymentModal({
                     customer ||
                     customerName.trim() ||
                     customerPhone.trim()) && <option value="CREDIT">Credit</option>}
+                {settings.payments.demoQr &&
+                  (settings.payments.khalti || settings.payments.esewa || settings.payments.fonepay) && (
+                    <option value="ONLINE_QR">Online payment (QR on invoice)</option>
+                  )}
                 <option value="OTHER">Other</option>
               </Select>
               <Input
@@ -315,12 +343,24 @@ export function PaymentModal({
           ))}
 
           {paymentMode === "split" && balance > 0 && (
-            <button
-              onClick={handleAddPayment}
-              className="w-full px-3 py-2 bg-zinc-100 text-text rounded text-sm hover:bg-zinc-200 font-medium"
-            >
-              + Add Payment Method
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={handleAddPayment}
+                className="w-full px-3 py-2 bg-zinc-100 text-text rounded text-sm hover:bg-zinc-200 font-medium"
+              >
+                + Add Payment Method
+              </button>
+              {settings.payments.demoQr &&
+                (settings.payments.khalti || settings.payments.esewa || settings.payments.fonepay) &&
+                !payments.some((p) => p.method === "ONLINE_QR") && (
+                  <button
+                    onClick={() => setPayments([...payments, { method: "ONLINE_QR", amount: balance }])}
+                    className="w-full rounded border border-accent px-3 py-2 text-sm font-semibold text-accent hover:bg-orange-50"
+                  >
+                    Collect remaining NPR {formatCurrency(balance)} online (QR)
+                  </button>
+                )}
+            </div>
           )}
         </div>
 
@@ -362,5 +402,7 @@ export function PaymentModal({
         </div>
       </div>
     </Modal>
+
+    </>
   );
 }

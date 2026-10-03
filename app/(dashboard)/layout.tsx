@@ -3,6 +3,7 @@ import { getAccess } from "@/lib/access";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { MobileBottomNav, MobileHeader } from "@/components/layout/MobileShell";
+import { PaymentNotifier } from "@/components/layout/PaymentNotifier";
 import { SettingsProvider } from "@/components/providers/SettingsProvider";
 import { getSettings } from "@/lib/settings";
 
@@ -20,6 +21,7 @@ export default async function DashboardLayout({
   return (
     <SettingsProvider settings={settings}>
     <div className="flex min-h-screen">
+      <PaymentNotifier />
       <Sidebar
         isOwner={access.isOwner}
         permissions={access.permissions}

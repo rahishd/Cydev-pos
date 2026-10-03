@@ -158,13 +158,10 @@ export function NewSaleFlow({ staffId, staffName }: { staffId: string; staffName
       setShowPayment(false);
       setShowInvoice(true);
 
-      setTimeout(() => {
-        setCart([]);
-        setDiscount(0);
-        setTax(0);
-        setStep("search");
-        setShowInvoice(false);
-      }, 5000);
+      setCart([]);
+      setDiscount(0);
+      setTax(0);
+      setStep("search");
     } catch (err) {
       console.error("Sale failed:", err);
       alert(err instanceof Error ? err.message : "Failed to create sale");

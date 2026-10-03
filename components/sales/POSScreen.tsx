@@ -187,13 +187,11 @@ export function POSScreen({ staffId, staffName }: { staffId: string; staffName: 
       setShowInvoice(true);
 
       // Reset
-      setTimeout(() => {
-        setCart([]);
-        setDiscount(0);
-        setTax(0);
-        setSelectedCustomer(null);
-        setTab("select");
-      }, 5000);
+      setCart([]);
+      setDiscount(0);
+      setTax(0);
+      setSelectedCustomer(null);
+      setTab("select");
     } catch (err) {
       console.error("Sale failed:", err);
       alert(err instanceof Error ? err.message : "Failed to create sale");

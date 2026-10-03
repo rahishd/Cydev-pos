@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { formatCurrency } from "@/lib/date-utils";
 import { useSettings } from "@/components/providers/SettingsProvider";
+import { OnlinePayPanel } from "@/components/sales/OnlinePaymentFlow";
 import {
   downloadInvoicePdf,
   normalizeWhatsAppNumber,
@@ -48,6 +49,8 @@ export function SalesHistoryTab({
   const invoiceSettings = useSettings().invoice;
   const pdfEnabled = Boolean(invoiceSettings.enablePdf && invoiceSettings.enableReprint);
   const [contact, setContact] = useState("");
+  const [panelSale, setPanelSale] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSearch = async () => {
@@ -75,6 +78,8 @@ export function SalesHistoryTab({
     try {
       const details = await getSaleDetails(saleId);
       setSelectedSale(details);
+      setPanelSale(details?.outstanding > 0.001 ? saleId : null);
+      setWaiting(false);
       setContact(details?.sale?.customer?.phone ?? "");
       setShowDetails(true);
     } catch (err) {
@@ -331,6 +336,20 @@ export function SalesHistoryTab({
               </div>
             </Card>
 
+            {/* Collect what is still unpaid by QR */}
+            {panelSale === selectedSale.sale.id && (
+              <OnlinePayPanel
+                saleId={selectedSale.sale.id}
+                amount={Math.max(0.01, selectedSale.outstanding)}
+                onWaitingChange={setWaiting}
+                onPaid={() => {
+                  // Refresh the totals shown here and the list behind, while keeping the success message.
+                  getSaleDetails(selectedSale.sale.id).then(setSelectedSale).catch(() => {});
+                  handleSearch();
+                }}
+              />
+            )}
+
             {/* WhatsApp */}
             {pdfEnabled && (
             <Card className="p-3">
@@ -345,8 +364,8 @@ export function SalesHistoryTab({
                   placeholder="98XXXXXXXX"
                   className="flex-1 px-2 py-1.5 text-sm border border-border rounded"
                 />
-                <Button onClick={handleWhatsApp} disabled={!validContact || sending}>
-                  {sending ? "Opening..." : "Send Invoice via WhatsApp"}
+                <Button onClick={handleWhatsApp} disabled={!validContact || sending || waiting}>
+                  {waiting ? "Waiting for payment..." : sending ? "Opening..." : "Send Invoice via WhatsApp"}
                 </Button>
               </div>
             </Card>
