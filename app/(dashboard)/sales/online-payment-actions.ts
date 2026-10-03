@@ -11,14 +11,11 @@ import { logAudit, npr } from "@/lib/audit";
 
 export type OnlineGateway = { id: string; label: string };
 
-/** Gateways the shop has switched on, or an empty list when demo QR payments are off. */
+/** Khalti, eSewa and Fonepay when QR payments are on; nothing when they are off. */
 export async function getOnlineGateways(): Promise<OnlineGateway[]> {
   await assertPermission("sales.create");
-  const payments = (await getSettings()).payments;
-  if (!payments.demoQr) return [];
-  return Object.entries(GATEWAYS)
-    .filter(([, g]) => Boolean(payments[g.settingKey]))
-    .map(([id, g]) => ({ id, label: g.label }));
+  if (!(await getSettings()).payments.demoQr) return [];
+  return Object.entries(GATEWAYS).map(([id, g]) => ({ id, label: g.label }));
 }
 
 async function origin() {
@@ -43,9 +40,6 @@ export async function createPaymentRequest(gateway: string, amount: number, sale
 
   if (!settings.payments.demoQr) throw new Error("QR payments are turned off in Settings.");
   if (!isGateway(gateway)) throw new Error("Unknown payment gateway.");
-  if (!settings.payments[GATEWAYS[gateway].settingKey]) {
-    throw new Error(`${GATEWAYS[gateway].label} is turned off in Settings.`);
-  }
   if (!Number.isFinite(amount) || amount <= 0) throw new Error("Enter an amount to collect online.");
   if (saleId) {
     const sale = await prisma.sale.findUnique({ where: { id: saleId }, select: { total: true, amountPaid: true } });

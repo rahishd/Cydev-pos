@@ -307,7 +307,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         type: "toggle",
         default: true,
         applied: true,
-        help: "SIMULATION ONLY: the cashier shows a QR, the customer taps Confirm on a demo page, and the sale is marked paid. No money moves and nothing is checked with eSewa or Khalti, so turn this off before real use.",
+        help: "When on, the payment method list shows just Cash and Online (QR); the cashier then picks Khalti, eSewa or Fonepay on the invoice. The eSewa, Khalti, Fonepay, Card and Bank Transfer switches above only matter when this is off. SIMULATION ONLY: no money moves and nothing is checked with eSewa or Khalti, so turn this off before real use.",
       },
     ],
   },

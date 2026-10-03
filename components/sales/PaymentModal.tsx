@@ -45,10 +45,16 @@ export function PaymentModal({
     BANK_TRANSFER: Boolean(settings.payments.bankTransfer),
     CARD: Boolean(settings.payments.card),
   };
+  // With QR payments on, the list is simply Cash or Online (QR); the gateway is chosen on the invoice.
+  const qrAvailable = Boolean(settings.payments.demoQr);
   const preferred = String(settings.sales.defaultPaymentMethod);
-  const defaultMethod = enabledMethods[preferred]
-    ? preferred
-    : Object.keys(enabledMethods).find((m) => enabledMethods[m]) ?? "OTHER";
+  const defaultMethod = qrAvailable
+    ? enabledMethods.CASH
+      ? "CASH"
+      : "ONLINE_QR"
+    : enabledMethods[preferred]
+      ? preferred
+      : Object.keys(enabledMethods).find((m) => enabledMethods[m]) ?? "OTHER";
   const dueDays = Number(settings.customers.creditDueDays) || 30;
 
   const [deliveryMethod, setDeliveryMethod] = useState<"IN_SHOP" | "COD">("IN_SHOP");
@@ -305,22 +311,23 @@ export function PaymentModal({
                 className="flex-1"
               >
                 {enabledMethods.CASH && <option value="CASH">Cash</option>}
-                {enabledMethods.ESEWA && <option value="ESEWA">eSewa</option>}
-                {enabledMethods.KHALTI && <option value="KHALTI">Khalti</option>}
-                {enabledMethods.FONEPAY && <option value="FONEPAY">Fonepay</option>}
-                {enabledMethods.BANK_TRANSFER && <option value="BANK_TRANSFER">Bank Transfer</option>}
-                {enabledMethods.CARD && <option value="CARD">Card</option>}
-                {settings.payments.credit &&
-                  settings.customers.creditEnabled &&
-                  (!settings.sales.requireCustomerForCredit ||
-                    customer ||
-                    customerName.trim() ||
-                    customerPhone.trim()) && <option value="CREDIT">Credit</option>}
-                {settings.payments.demoQr &&
-                  (settings.payments.khalti || settings.payments.esewa || settings.payments.fonepay) && (
-                    <option value="ONLINE_QR">Online payment (QR on invoice)</option>
-                  )}
-                <option value="OTHER">Other</option>
+                {qrAvailable && <option value="ONLINE_QR">Online (QR)</option>}
+                {!qrAvailable && (
+                  <>
+                    {enabledMethods.ESEWA && <option value="ESEWA">eSewa</option>}
+                    {enabledMethods.KHALTI && <option value="KHALTI">Khalti</option>}
+                    {enabledMethods.FONEPAY && <option value="FONEPAY">Fonepay</option>}
+                    {enabledMethods.BANK_TRANSFER && <option value="BANK_TRANSFER">Bank Transfer</option>}
+                    {enabledMethods.CARD && <option value="CARD">Card</option>}
+                    {settings.payments.credit &&
+                      settings.customers.creditEnabled &&
+                      (!settings.sales.requireCustomerForCredit ||
+                        customer ||
+                        customerName.trim() ||
+                        customerPhone.trim()) && <option value="CREDIT">Credit</option>}
+                    <option value="OTHER">Other</option>
+                  </>
+                )}
               </Select>
               <Input
                 type="number"
@@ -350,9 +357,7 @@ export function PaymentModal({
               >
                 + Add Payment Method
               </button>
-              {settings.payments.demoQr &&
-                (settings.payments.khalti || settings.payments.esewa || settings.payments.fonepay) &&
-                !payments.some((p) => p.method === "ONLINE_QR") && (
+              {qrAvailable && !payments.some((p) => p.method === "ONLINE_QR") && (
                   <button
                     onClick={() => setPayments([...payments, { method: "ONLINE_QR", amount: balance }])}
                     className="w-full rounded border border-accent px-3 py-2 text-sm font-semibold text-accent hover:bg-orange-50"
