@@ -1,3 +1,4 @@
+import { requirePermission } from "@/lib/access";
 import { getPurchasesPageData } from "./actions";
 import { PurchasesClient } from "@/components/purchases/PurchasesClient";
 
@@ -13,6 +14,7 @@ type SearchParams = Promise<{
 export default async function PurchasesPage(props: {
   searchParams: SearchParams;
 }) {
+  await requirePermission("purchases.view");
   const searchParams = await props.searchParams;
   const data = await getPurchasesPageData(
     searchParams.search,

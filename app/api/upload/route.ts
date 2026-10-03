@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { put, del } from "@vercel/blob";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "application/pdf"];

@@ -1,3 +1,4 @@
+import { requirePermission } from "@/lib/access";
 import { getCustomerDetails } from "../actions";
 import { CustomerDetailClient } from "@/components/customers/CustomerDetailClient";
 
@@ -10,6 +11,7 @@ type Params = Promise<{
 export default async function CustomerDetailPage(props: {
   params: Params;
 }) {
+  await requirePermission("customers.history", "customers.view");
   const params = await props.params;
   const data = await getCustomerDetails(params.id);
 

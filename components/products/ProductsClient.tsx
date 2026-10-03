@@ -1,5 +1,6 @@
 "use client";
 
+import { useSettings } from "@/components/providers/SettingsProvider";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
@@ -51,7 +52,7 @@ interface FormState {
   variants: VariantRow[];
 }
 
-const emptyForm = (): FormState => ({
+const emptyForm = (minStock = "0"): FormState => ({
   name: "",
   sku: "",
   categoryId: "",
@@ -61,14 +62,14 @@ const emptyForm = (): FormState => ({
   purchasePrice: "",
   sellingPrice: "",
   discountPrice: "",
-  minStockLevel: "0",
+  minStockLevel: minStock,
   status: "ACTIVE",
   imageUrl: "",
   openingStock: "0",
   variants: [],
 });
 
-const blankVariant = (baseSku: string, idx: number, buyPrice: string, sellPrice: string): VariantRow => ({
+const blankVariant = (baseSku: string, idx: number, buyPrice: string, sellPrice: string, minStock = "0"): VariantRow => ({
   size: "",
   color: "",
   material: "",
@@ -76,7 +77,7 @@ const blankVariant = (baseSku: string, idx: number, buyPrice: string, sellPrice:
   purchasePrice: buyPrice,
   sellingPrice: sellPrice,
   quantity: "0",
-  minStockLevel: "0",
+  minStockLevel: minStock,
 });
 
 // ---------- Sub-components ----------
@@ -105,6 +106,7 @@ function FormRow({ children }: { children: React.ReactNode }) {
 // ---------- Main component ----------
 
 export function ProductsClient({ data }: { data: ProductsPageData }) {
+  const defaultMin = String(useSettings().inventory.defaultMinStock ?? 0);
   const router = useRouter();
 
   // Local catalog state — updated optimistically on quick-create
@@ -124,7 +126,7 @@ export function ProductsClient({ data }: { data: ProductsPageData }) {
   // Drawer
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<ProductWithRelations | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm());
+  const [form, setForm] = useState<FormState>(emptyForm(defaultMin));
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -157,7 +159,7 @@ export function ProductsClient({ data }: { data: ProductsPageData }) {
   // ---------- Drawer helpers ----------
   const openAdd = () => {
     setEditing(null);
-    setForm(emptyForm());
+    setForm(emptyForm(defaultMin));
     setFormError(null);
     setDrawerOpen(true);
   };
@@ -202,7 +204,7 @@ export function ProductsClient({ data }: { data: ProductsPageData }) {
       ...prev,
       variants: [
         ...prev.variants,
-        blankVariant(prev.sku, prev.variants.length + 1, prev.purchasePrice, prev.sellingPrice),
+        blankVariant(prev.sku, prev.variants.length + 1, prev.purchasePrice, prev.sellingPrice, defaultMin),
       ],
     }));
   };

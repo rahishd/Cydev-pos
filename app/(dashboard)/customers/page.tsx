@@ -1,3 +1,4 @@
+import { requirePermission } from "@/lib/access";
 import { getCustomersPageData } from "./actions";
 import { CustomersClient } from "@/components/customers/CustomersClient";
 
@@ -12,6 +13,7 @@ type SearchParams = Promise<{
 export default async function CustomersPage(props: {
   searchParams: SearchParams;
 }) {
+  await requirePermission("customers.view");
   const searchParams = await props.searchParams;
 
   const data = await getCustomersPageData(

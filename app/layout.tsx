@@ -4,7 +4,7 @@ import { CreditFooter } from "@/components/layout/CreditFooter";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Inventory — Bag & Shoes",
+  title: "Labash Fashion — Inventory",
   description: "Internal inventory and sales management system",
 };
 

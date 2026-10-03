@@ -1,5 +1,8 @@
 "use server";
 
+import { assertPermission } from "@/lib/access";
+import { logAudit } from "@/lib/audit";
+import { getSettings } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 
 export async function getInventoryPageData(
@@ -8,6 +11,7 @@ export async function getInventoryPageData(
   brandId?: string,
   stockStatus?: "all" | "low" | "out"
 ) {
+  await assertPermission("inventory.view");
   const whereClause: any = {
     product: { status: "ACTIVE" },
   };
@@ -110,6 +114,7 @@ export async function getInventoryPageData(
 }
 
 export async function getVariantDetails(variantId: string) {
+  await assertPermission("inventory.view");
   const variant = await prisma.productVariant.findUnique({
     where: { id: variantId },
     select: {
@@ -177,6 +182,7 @@ export async function getStockMovements(
   variantId?: string,
   limit: number = 50
 ) {
+  await assertPermission("inventory.history");
   const movements = await prisma.stockMovement.findMany({
     where: variantId ? { productVariantId: variantId } : undefined,
     select: {
@@ -207,13 +213,29 @@ export async function createStockMovement(
   type: string,
   quantity: number,
   reason: string,
-  userId: string
+  _clientUserId?: string
 ) {
+  const adjusting =
+    quantity < 0 || ["ADJUSTMENT", "DAMAGE", "LOSS", "MANUAL_ADJUSTMENT", "SUPPLIER_RETURN"].includes(type);
+  const access = await assertPermission(adjusting ? "inventory.adjust" : "inventory.add_stock");
+  const userId = access.id;
+  const stockRules = (await getSettings()).inventory;
+  if (adjusting && stockRules.requireAdjustmentReason && !reason?.trim()) {
+    throw new Error("Please enter a reason for this stock adjustment.");
+  }
+  if (type === "DAMAGE" && !stockRules.allowDamaged) throw new Error("Damaged stock entries are turned off in Settings.");
+  if (type === "LOSS" && !stockRules.allowLost) throw new Error("Lost stock entries are turned off in Settings.");
+
   const variant = await prisma.productVariant.findUnique({
     where: { id: variantId },
+    include: { product: { select: { name: true } } },
   });
 
   if (!variant) throw new Error("Variant not found");
+
+  if (variant.quantity + quantity < 0 && !stockRules.allowNegativeStock) {
+    throw new Error("Insufficient stock");
+  }
 
   const movement = await prisma.stockMovement.create({
     data: {
@@ -227,11 +249,30 @@ export async function createStockMovement(
 
   // Update variant quantity
   const newQuantity = variant.quantity + quantity;
-  if (newQuantity < 0) throw new Error("Insufficient stock");
+  if (newQuantity < 0 && !stockRules.allowNegativeStock) throw new Error("Insufficient stock");
 
   await prisma.productVariant.update({
     where: { id: variantId },
     data: { quantity: newQuantity },
+  });
+
+  const variantLabel = [variant.size, variant.color].filter(Boolean).join(" / ") || variant.sku;
+  await logAudit({
+    actor: access,
+    action: adjusting ? "adjustment" : "created",
+    title: adjusting
+      ? type === "DAMAGE"
+        ? "Damaged Stock"
+        : type === "LOSS"
+          ? "Lost Stock"
+          : "Stock Adjustment"
+      : "Stock Added",
+    module: "Inventory",
+    entityType: "StockMovement",
+    entityId: variantId,
+    description: `${variant.product.name} (${variantLabel}): ${variant.quantity} -> ${newQuantity} (${quantity > 0 ? "+" : ""}${quantity})${reason?.trim() ? ". Reason: " + reason.trim() : ""}`,
+    previous: { stock: variant.quantity },
+    next: { stock: newQuantity, change: quantity, type, reason: reason?.trim() || null },
   });
 
   return movement;

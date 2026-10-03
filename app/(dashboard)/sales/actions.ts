@@ -1,14 +1,23 @@
 "use server";
 
+import { assertPermission } from "@/lib/access";
+import { logAudit, npr } from "@/lib/audit";
+import { getSettings } from "@/lib/settings";
+import { formatNumber } from "@/lib/settings-schema";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { invoiceToken } from "@/lib/invoice-link";
 import { Decimal } from "@prisma/client/runtime/library";
 
 export async function getProductsForPOS(search?: string, categoryId?: string, brandId?: string) {
+  await assertPermission("sales.create");
+  const posSettings = await getSettings();
   const whereClause: any = {
     status: "ACTIVE",
     variants: {
       some: {
-        quantity: { gt: 0 },
+        ...(posSettings.sales.allowOutOfStockSales ? {} : { quantity: { gt: 0 } }),
         status: "ACTIVE",
       },
     },
@@ -78,6 +87,7 @@ export async function getProductsForPOS(search?: string, categoryId?: string, br
 }
 
 export async function getCustomers(search?: string) {
+  await assertPermission("sales.create");
   const whereClause: any = {};
 
   if (search) {
@@ -108,6 +118,7 @@ export async function getCustomers(search?: string) {
 }
 
 export async function searchCustomersByNameOrPhone(query: string) {
+  await assertPermission("sales.create");
   if (!query.trim()) return [];
 
   const customers = await prisma.customer.findMany({
@@ -151,18 +162,117 @@ export async function createSale(
   dueDate?: Date,
   deliveryMethod: string = "IN_SHOP",
   deliveryAddress?: string,
-  deliveryPhone?: string
+  deliveryPhone?: string,
+  customerName?: string,
+  customerPhone?: string
 ) {
+  const access = await assertPermission("sales.create");
+  if ((discount > 0 || items.some((i) => i.discount > 0)) && !access.can("sales.discount")) {
+    throw new Error("You don't have permission to apply discounts. Please ask the Owner.");
+  }
+  staffId = access.id;
+
+  const settings = await getSettings();
+  const methodLabels: Record<string, [string, boolean]> = {
+    CASH: ["Cash", Boolean(settings.payments.cash)],
+    ESEWA: ["eSewa", Boolean(settings.payments.esewa)],
+    KHALTI: ["Khalti", Boolean(settings.payments.khalti)],
+    FONEPAY: ["Fonepay", Boolean(settings.payments.fonepay)],
+    CARD: ["Card", Boolean(settings.payments.card)],
+    BANK_TRANSFER: ["Bank Transfer", Boolean(settings.payments.bankTransfer)],
+    CREDIT: ["Credit", Boolean(settings.payments.credit)],
+  };
+  const usedMethods = Array.isArray(payments) ? payments.map((p) => p.method) : [payments as string];
+  for (const m of usedMethods) {
+    const entry = methodLabels[m];
+    if (entry && !entry[1]) throw new Error(`${entry[0]} payments are turned off in Settings.`);
+  }
+
+  const usesCredit = usedMethods.includes("CREDIT");
+  if (usesCredit) {
+    if (!settings.customers.creditEnabled) throw new Error("Customer credit is turned off in Settings.");
+    if (settings.sales.requireCustomerForCredit && !customerId && !customerName?.trim() && !customerPhone?.trim()) {
+      throw new Error("Please enter the customer's name or phone for a credit sale.");
+    }
+  }
+
+  const itemDiscounts = items.reduce((sum, i) => sum + (i.discount || 0), 0);
+  const totalDiscount = discount + itemDiscounts;
+  if (totalDiscount > 0) {
+    if (!settings.sales.allowDiscounts) throw new Error("Discounts are turned off in Settings.");
+    if (!access.isOwner) {
+      const gross = subtotal + itemDiscounts;
+      const percent = gross > 0 ? (totalDiscount / gross) * 100 : 0;
+      const limit = Number(settings.sales.maxStaffDiscountPercent);
+      if (percent > limit + 0.001) {
+        throw new Error(
+          `A ${percent.toFixed(1)}% discount is above the staff limit of ${limit}%. Please ask the Owner to complete this sale.`
+        );
+      }
+    }
+  }
+
+  if (!settings.inventory.allowNegativeStock) {
+    for (const item of items) {
+      const v = await prisma.productVariant.findUnique({
+        where: { id: item.variantId },
+        select: { quantity: true, sku: true },
+      });
+      if (!v) throw new Error("A product in the cart no longer exists.");
+      if (v.quantity < item.quantity) {
+        throw new Error(`Not enough stock for ${v.sku}: only ${v.quantity} left.`);
+      }
+    }
+  }
+
+  // Resolve customer: use given id, else match by phone/name, else create
+  if (!customerId && (customerName?.trim() || customerPhone?.trim())) {
+    const name = customerName?.trim() || "";
+    const phone = customerPhone?.trim() || "";
+    let existing = phone
+      ? await prisma.customer.findFirst({ where: { phone } })
+      : await prisma.customer.findFirst({
+          where: { name: { equals: name, mode: "insensitive" } },
+        });
+    if (!existing) {
+      existing = await prisma.customer.create({
+        data: {
+          name: name || phone,
+          phone: phone || null,
+          address: deliveryAddress || null,
+        },
+      });
+    }
+    customerId = existing.id;
+  }
+
+  if (usesCredit && customerId && Number(settings.customers.maxCreditAmount) > 0) {
+    const open = await prisma.customerCredit.aggregate({
+      where: { customerId },
+      _sum: { amount: true, amountPaid: true },
+    });
+    const already = Number(open._sum.amount ?? 0) - Number(open._sum.amountPaid ?? 0);
+    const adding = Math.max(0, subtotal - discount + tax - amountPaid);
+    const limit = Number(settings.customers.maxCreditAmount);
+    if (already + adding > limit) {
+      throw new Error(
+        `This would take the customer's credit to NPR ${(already + adding).toLocaleString("en-US")}, above the limit of NPR ${limit.toLocaleString("en-US")}.`
+      );
+    }
+  }
+
   // Generate invoice number
   const lastSale = await prisma.sale.findFirst({
     orderBy: { createdAt: "desc" },
     select: { invoiceNo: true },
   });
 
-  const lastNum = lastSale?.invoiceNo
-    ? parseInt(lastSale.invoiceNo.replace("INV-", ""))
-    : 0;
-  const newInvoiceNo = `INV-${String(lastNum + 1).padStart(6, "0")}`;
+  const lastNum = parseInt(/(\d+)$/.exec(lastSale?.invoiceNo ?? "")?.[1] ?? "0", 10) || 0;
+  const newInvoiceNo = formatNumber(
+    String(settings.invoice.prefix ?? "INV-"),
+    Math.max(lastNum + 1, Number(settings.invoice.startingNumber) || 1),
+    Number(settings.invoice.numberDigits) || 6
+  );
 
   // Calculate total
   const total = subtotal - discount + tax;
@@ -231,9 +341,7 @@ export async function createSale(
       select: { quantity: true },
     });
 
-    if (!variant || variant.quantity < item.quantity) {
-      throw new Error("Insufficient stock");
-    }
+    if (!variant) throw new Error("A product in the cart no longer exists.");
 
     // Create stock movement
     await prisma.stockMovement.create({
@@ -265,16 +373,52 @@ export async function createSale(
           customerId,
           invoiceRef: newInvoiceNo,
           amount: new Decimal(outstandingAmount),
-          dueDate: dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days default
+          dueDate: dueDate || new Date(Date.now() + (Number(settings.customers.creditDueDays) || 30) * 24 * 60 * 60 * 1000),
         },
       });
     }
   }
 
+  const variantRows = await prisma.productVariant.findMany({
+    where: { id: { in: items.map((i) => i.variantId) } },
+    select: { id: true, size: true, color: true, product: { select: { name: true } } },
+  });
+  const itemSummary = items
+    .slice(0, 4)
+    .map((i) => {
+      const v = variantRows.find((r) => r.id === i.variantId);
+      const opt = [v?.size, v?.color].filter(Boolean).join("/");
+      return `${v?.product.name ?? "Item"}${opt ? " (" + opt + ")" : ""} x${i.quantity}`;
+    })
+    .join(", ");
+  await logAudit({
+    actor: access,
+    action: "created",
+    title: "Sale Completed",
+    module: "Sales",
+    entityType: "Sale",
+    entityId: sale.id,
+    description:
+      `Invoice ${newInvoiceNo}: ${npr(total)} paid by ${[...new Set(usedMethods)].map((m) => m.replace(/_/g, " ")).join(" + ")}, ` +
+      `${customerId ? "registered customer" : "walk-in"}` +
+      (totalDiscount > 0 ? `, discount ${npr(totalDiscount)}` : "") +
+      (total - amountPaid > 0.001 ? `, due ${npr(total - amountPaid)}` : "") +
+      `. Items: ${itemSummary}${items.length > 4 ? ", ..." : ""}`,
+    next: {
+      invoiceNo: newInvoiceNo,
+      total,
+      paid: amountPaid,
+      discount: totalDiscount,
+      payment: usedMethods,
+      items: items.length,
+    },
+  });
+
   return { id: sale.id, invoiceNo: newInvoiceNo };
 }
 
 export async function getSalesHistory(search?: string, customerId?: string, paymentMethod?: string, page = 1) {
+  await assertPermission("sales.history");
   const whereClause: any = {};
 
   if (search) {
@@ -322,6 +466,7 @@ export async function getSalesHistory(search?: string, customerId?: string, paym
 }
 
 export async function getSaleDetails(saleId: string) {
+  const access = await assertPermission("sales.history");
   const sale = await prisma.sale.findUnique({
     where: { id: saleId },
     select: {
@@ -333,7 +478,7 @@ export async function getSaleDetails(saleId: string) {
       subtotal: true,
       amountPaid: true,
       createdAt: true,
-      customer: { select: { id: true, name: true, phone: true } },
+      customer: { select: { id: true, name: true, phone: true, address: true } },
       staff: { select: { name: true } },
       items: {
         select: {
@@ -399,7 +544,7 @@ export async function getSaleDetails(saleId: string) {
       returns: sale.returns,
     },
     outstanding: Number(sale.total) - Number(sale.amountPaid),
-    profit,
+    profit: access.can("reports.gross_profit") ? profit : undefined,
   };
 }
 
@@ -413,15 +558,28 @@ export async function processSaleReturn(
   newVariantId?: string,
   priceDifference?: number
 ) {
+  const access = await assertPermission(type === "EXCHANGE" ? "sales.exchange" : "sales.return");
+  const returnRules = (await getSettings()).returns;
+  if (type === "RETURN" && !returnRules.returnsEnabled) throw new Error("Returns are turned off in Settings.");
+  if (type === "EXCHANGE" && !returnRules.exchangeEnabled) throw new Error("Exchanges are turned off in Settings.");
   const sale = await prisma.sale.findUnique({
     where: { id: saleId },
     select: {
       invoiceNo: true,
+      createdAt: true,
       items: { select: { id: true, productVariantId: true, unitPrice: true, quantity: true, unitCost: true } },
     },
   });
 
   if (!sale) throw new Error("Sale not found");
+
+  const windowDays = Number(returnRules.returnWindowDays);
+  if (windowDays > 0 && !access.isOwner) {
+    const ageDays = (Date.now() - sale.createdAt.getTime()) / 86400000;
+    if (ageDays > windowDays) {
+      throw new Error(`This sale is older than the ${windowDays}-day return period. Only the Owner can accept it.`);
+    }
+  }
 
   const saleItem = sale.items.find((i) => i.id === itemId);
   if (!saleItem || quantity > saleItem.quantity) {
@@ -443,22 +601,24 @@ export async function processSaleReturn(
     select: { id: true },
   });
 
-  // Restore inventory for returned item
-  await prisma.stockMovement.create({
-    data: {
-      productVariantId: saleItem.productVariantId,
-      type: "CUSTOMER_RETURN",
-      quantityChange: quantity,
-      reason: `Return from ${sale.invoiceNo}`,
-      referenceId: saleId,
-      createdById: "system", // Should be actual user ID
-    },
-  });
+  // Restore inventory for returned item (unless the shop wants returns checked before restocking)
+  if (returnRules.autoRestock) {
+    await prisma.stockMovement.create({
+      data: {
+        productVariantId: saleItem.productVariantId,
+        type: "CUSTOMER_RETURN",
+        quantityChange: quantity,
+        reason: `Return from ${sale.invoiceNo}`,
+        referenceId: saleId,
+        createdById: access.id,
+      },
+    });
 
-  await prisma.productVariant.update({
-    where: { id: saleItem.productVariantId },
-    data: { quantity: { increment: quantity } },
-  });
+    await prisma.productVariant.update({
+      where: { id: saleItem.productVariantId },
+      data: { quantity: { increment: quantity } },
+    });
+  }
 
   // Handle exchange
   if (type === "EXCHANGE" && newVariantId && priceDifference !== undefined) {
@@ -476,7 +636,7 @@ export async function processSaleReturn(
         quantityChange: -quantity,
         reason: `Exchange for ${sale.invoiceNo}`,
         referenceId: saleId,
-        createdById: "system",
+        createdById: access.id,
       },
     });
 
@@ -508,13 +668,44 @@ export async function processSaleReturn(
     }
   }
 
+  {
+    const [oldV, newV] = await Promise.all([
+      prisma.productVariant.findUnique({
+        where: { id: saleItem.productVariantId },
+        select: { size: true, color: true, product: { select: { name: true } } },
+      }),
+      newVariantId
+        ? prisma.productVariant.findUnique({
+            where: { id: newVariantId },
+            select: { size: true, color: true, product: { select: { name: true } } },
+          })
+        : Promise.resolve(null),
+    ]);
+    const label = (v: typeof oldV) =>
+      v ? `${v.product.name}${[v.size, v.color].filter(Boolean).length ? " (" + [v.size, v.color].filter(Boolean).join("/") + ")" : ""}` : "item";
+    await logAudit({
+      actor: access,
+      action: type === "EXCHANGE" ? "exchange" : "return",
+      title: type === "EXCHANGE" ? "Product Exchanged" : "Sale Returned",
+      module: "Sales",
+      entityType: "SaleReturn",
+      entityId: returnRecord.id,
+      description:
+        type === "EXCHANGE"
+          ? `${sale.invoiceNo}: returned ${label(oldV)} x${quantity}, given ${label(newV)}. Difference ${npr(priceDifference ?? 0)}`
+          : `${sale.invoiceNo}: returned ${label(oldV)} x${quantity}, refund ${npr(Math.abs(refundAmount))} (${refundMethod.replace(/_/g, " ")})${reason?.trim() ? ". Reason: " + reason.trim() : ""}`,
+      next: { invoiceNo: sale.invoiceNo, type, quantity, refund: Math.abs(refundAmount), restocked: returnRules.autoRestock },
+    });
+  }
+
   return { returnId: returnRecord.id, refundAmount: Math.abs(refundAmount) };
 }
 
 export async function recordAdditionalPayment(saleId: string, amount: number, method: string) {
+  const access = await assertPermission("sales.create", "customers.credit");
   const sale = await prisma.sale.findUnique({
     where: { id: saleId },
-    select: { total: true, amountPaid: true },
+    select: { total: true, amountPaid: true, invoiceNo: true },
   });
 
   if (!sale) throw new Error("Sale not found");
@@ -556,5 +747,42 @@ export async function recordAdditionalPayment(saleId: string, amount: number, me
     }
   }
 
+  await logAudit({
+    actor: access,
+    action: "payment",
+    title: "Payment Received",
+    module: "Sales",
+    entityType: "Sale",
+    entityId: saleId,
+    description: `${sale.invoiceNo}: received ${npr(amount)} (${method.replace(/_/g, " ")}). Paid ${npr(newAmountPaid)} of ${npr(Number(sale.total))}`,
+    previous: { paid: Number(sale.amountPaid) },
+    next: { paid: newAmountPaid },
+  });
+
   return { newAmountPaid };
+}
+
+export async function getInvoiceShareUrl(saleId: string) {
+  const invoiceSettings = (await getSettings()).invoice;
+  if (!invoiceSettings.enablePdf) throw new Error("PDF invoices are turned off in Settings.");
+  const access = await assertPermission("sales.history", "sales.create");
+  const session = await auth();
+  if (!session) throw new Error("Unauthorized");
+  const shared = await prisma.sale.findUnique({ where: { id: saleId }, select: { invoiceNo: true } });
+  await logAudit({
+    actor: access,
+    action: "invoice_shared",
+    title: "Invoice Shared",
+    module: "Sales",
+    entityType: "Invoice",
+    entityId: saleId,
+    description: `Shared invoice ${shared?.invoiceNo ?? ""} by link`,
+  });
+
+  const hdrs = await headers();
+  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host");
+  const proto = hdrs.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
+  const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? `${proto}://${host}`;
+
+  return `${origin}/api/invoice/${saleId}?t=${invoiceToken(saleId)}`;
 }

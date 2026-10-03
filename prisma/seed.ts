@@ -4,19 +4,19 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = process.env.SEED_OWNER_EMAIL ?? "owner@shop.local";
+  const ownerUserId = (process.env.SEED_OWNER_USER_ID ?? "U001").toUpperCase();
   const password = process.env.SEED_OWNER_PASSWORD ?? "changeme123";
   const name = process.env.SEED_OWNER_NAME ?? "Owner";
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findUnique({ where: { userId: ownerUserId } });
   if (!existing) {
     const passwordHash = await bcrypt.hash(password, 10);
     await prisma.user.create({
-      data: { name, email, passwordHash, role: "OWNER" },
+      data: { name, userId: ownerUserId, passwordHash, role: "OWNER" },
     });
-    console.log(`Created Owner account: ${email} / ${password}`);
+    console.log(`Created Owner account: ${ownerUserId} / ${password}`);
   } else {
-    console.log(`Owner account already exists: ${email}`);
+    console.log(`Owner account already exists: ${ownerUserId}`);
   }
 
   // Seed categories if empty

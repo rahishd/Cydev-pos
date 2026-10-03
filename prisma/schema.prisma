@@ -9,12 +9,20 @@ datasource db {
 
 model User {
   id             String          @id @default(cuid())
+  userId         String          @unique
   name           String
-  email          String          @unique
+  contactNumber  String?
+  email          String?         @unique
   passwordHash   String
+  permissions    String[]        @default([])
+  createdById    String?
+  createdBy      User?           @relation("StaffCreatedBy", fields: [createdById], references: [id])
+  createdStaff   User[]          @relation("StaffCreatedBy")
   role           Role            @default(STAFF)
   status         UserStatus      @default(ACTIVE)
   lastLoginAt    DateTime?
+  failedLogins   Int             @default(0)
+  lockedUntil    DateTime?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   auditLogs      AuditLog[]
@@ -257,6 +265,7 @@ model CustomerCredit {
 model ExpenseCategory {
   id       String    @id @default(cuid())
   name     String    @unique
+  isActive Boolean   @default(true)
   expenses Expense[]
 }
 
@@ -277,15 +286,30 @@ model Expense {
 
 model AuditLog {
   id            String   @id @default(cuid())
-  userId        String
+  auditNo       Int      @unique @default(autoincrement())
+  userId        String?
+  userCode      String?
+  userName      String?
+  userRole      String?
   action        String
+  title         String?
+  module        String   @default("")
   affectedType  String
   affectedId    String?
+  description   String?
   previousValue Json?
   newValue      Json?
   reason        String?
+  status        String   @default("SUCCESS")
+  failureReason String?
+  ipAddress     String?
+  device        String?
   createdAt     DateTime @default(now())
-  user          User     @relation(fields: [userId], references: [id])
+  user          User?    @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([module])
+  @@index([userId])
 }
 
 model SystemSettings {
@@ -301,6 +325,7 @@ model SystemSettings {
   defaultDiscount   Decimal  @default(0) @db.Decimal(5, 2)
   defaultTaxPercent Decimal  @default(0) @db.Decimal(5, 2)
   returnPolicy      String?
+  data              Json     @default("{}")
   updatedAt         DateTime @updatedAt
 }
 

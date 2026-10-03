@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { getSalesHistory, getSaleDetails } from "@/app/(dashboard)/sales/actions";
+import { useEffect, useState } from "react";
+import { getSalesHistory, getSaleDetails, getInvoiceShareUrl } from "@/app/(dashboard)/sales/actions";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { formatCurrency } from "@/lib/date-utils";
+import { useSettings } from "@/components/providers/SettingsProvider";
+import {
+  downloadInvoicePdf,
+  normalizeWhatsAppNumber,
+  openWhatsAppChat,
+  type InvoiceData,
+} from "@/lib/invoice-pdf";
 
 type Sale = {
   id: string;
@@ -38,6 +45,9 @@ export function SalesHistoryTab({
   const [sales, setSales] = useState<Sale[]>(initialSalesHistory);
   const [selectedSale, setSelectedSale] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const invoiceSettings = useSettings().invoice;
+  const pdfEnabled = Boolean(invoiceSettings.enablePdf && invoiceSettings.enableReprint);
+  const [contact, setContact] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSearch = async () => {
@@ -56,13 +66,62 @@ export function SalesHistoryTab({
     }
   };
 
+  useEffect(() => {
+    if (initialSalesHistory.length === 0) handleSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleViewDetails = async (saleId: string) => {
     try {
       const details = await getSaleDetails(saleId);
       setSelectedSale(details);
+      setContact(details?.sale?.customer?.phone ?? "");
       setShowDetails(true);
     } catch (err) {
       console.error("Failed to load details:", err);
+    }
+  };
+
+  const [sending, setSending] = useState(false);
+
+  const pdfData = (): InvoiceData => {
+    const s = selectedSale.sale;
+    return {
+      invoiceNo: s.invoiceNo,
+      date: s.createdAt,
+      customer: s.customer
+        ? { name: s.customer.name, phone: contact || s.customer.phone, address: s.customer.address }
+        : contact
+          ? { phone: contact }
+          : null,
+      items: s.items.map((i: any) => ({
+        name: i.productVariant.product.name,
+        variant: [i.productVariant.size, i.productVariant.color].filter(Boolean).join(" / "),
+        quantity: i.quantity,
+        unitPrice: Number(i.unitPrice),
+        discount: Number(i.discount ?? 0),
+        total: Number(i.total),
+      })),
+      subtotal: Number(s.subtotal),
+      discount: Number(s.discount),
+      tax: Number(s.tax),
+      total: Number(s.total),
+      paid: Number(s.amountPaid),
+      method: s.payments
+        ? Array.from(new Set(s.payments.map((p: any) => p.method))).join(", ")
+        : undefined,
+    };
+  };
+
+  const validContact = normalizeWhatsAppNumber(contact).length >= 11;
+
+  const handleWhatsApp = async () => {
+    setSending(true);
+    try {
+      const url = await getInvoiceShareUrl(selectedSale.sale.id);
+      openWhatsAppChat(pdfData(), contact, url);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -169,7 +228,7 @@ export function SalesHistoryTab({
           title={`Invoice #${selectedSale.sale.invoiceNo}`}
           size="lg"
         >
-          <div className="space-y-4 max-h-96 overflow-y-auto">
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
             {/* Header */}
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -271,6 +330,38 @@ export function SalesHistoryTab({
                 )}
               </div>
             </Card>
+
+            {/* WhatsApp */}
+            {pdfEnabled && (
+            <Card className="p-3">
+              <label className="block text-xs font-semibold text-text mb-1">
+                Contact Number (WhatsApp)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  value={contact}
+                  onChange={(e) => setContact(e.target.value)}
+                  placeholder="98XXXXXXXX"
+                  className="flex-1 px-2 py-1.5 text-sm border border-border rounded"
+                />
+                <Button onClick={handleWhatsApp} disabled={!validContact || sending}>
+                  {sending ? "Opening..." : "Send Invoice via WhatsApp"}
+                </Button>
+              </div>
+            </Card>
+            )}
+
+            <div className="flex justify-end gap-2">
+              {pdfEnabled && (
+                <Button variant="ghost" onClick={() => downloadInvoicePdf(pdfData())}>
+                  Download PDF
+                </Button>
+              )}
+              <Button variant="ghost" onClick={() => setShowDetails(false)}>
+                Close
+              </Button>
+            </div>
           </div>
         </Modal>
       )}

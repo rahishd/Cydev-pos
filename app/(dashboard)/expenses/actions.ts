@@ -1,9 +1,14 @@
 "use server";
 
+import { assertPermission } from "@/lib/access";
+import { logAudit, npr } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Decimal } from "@prisma/client/runtime/library";
+import type { ExpenseStatus, PaymentMethod } from "@prisma/client";
+import { headers } from "next/headers";
+import { expenseToken, expenseReportToken, type ExpenseReportFilters } from "@/lib/invoice-link";
 
 export interface ExpensesPageData {
   expenses: Array<{
@@ -13,6 +18,7 @@ export interface ExpensesPageData {
     amount: number;
     date: Date;
     paymentMethod: string;
+    status: string;
     description: string | null;
     attachmentUrl: string | null;
     createdById: string;
@@ -35,6 +41,7 @@ export interface ExpensesPageData {
 }
 
 export async function getExpensesPageData(): Promise<ExpensesPageData> {
+  await assertPermission("expenses.view");
   const session = await auth();
   if (!session) throw new Error("Unauthorized");
 
@@ -50,6 +57,7 @@ export async function getExpensesPageData(): Promise<ExpensesPageData> {
       amount: true,
       date: true,
       paymentMethod: true,
+      status: true,
       description: true,
       attachmentUrl: true,
       createdById: true,
@@ -66,13 +74,14 @@ export async function getExpensesPageData(): Promise<ExpensesPageData> {
 
   // Fetch categories
   const categories = await prisma.expenseCategory.findMany({
+    where: { isActive: true },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
 
   // Calculate stats
   const thisMonthExpenses = expenses.filter(
-    (e) => e.date >= monthStart && e.date <= today
+    (e) => e.date >= monthStart && e.date < new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1)
   );
   const todayExpenses = expenses.filter((e) => {
     const eDate = new Date(e.date);
@@ -109,8 +118,9 @@ export async function getExpensesPageData(): Promise<ExpensesPageData> {
     }
   }
 
-  // Calculate unpaid total (feature to be implemented when status column is available)
-  const unpaidTotal = 0;
+  const unpaidTotal = expenses
+    .filter((e) => e.status === "UNPAID")
+    .reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0);
 
   const expensesData = expenses.map((e) => ({
     ...e,
@@ -136,6 +146,7 @@ export async function createExpense({
   amount,
   date,
   paymentMethod,
+  status = "PAID",
   description,
   attachmentUrl,
 }: {
@@ -143,9 +154,11 @@ export async function createExpense({
   amount: number;
   date: Date;
   paymentMethod: string;
+  status?: string;
   description?: string;
   attachmentUrl?: string;
 }) {
+  await assertPermission("expenses.add");
   const session = await auth();
   if (!session) throw new Error("Unauthorized");
 
@@ -154,13 +167,15 @@ export async function createExpense({
     where: { id: categoryId },
   });
   if (!category) throw new Error("Category not found");
+  if (!category.isActive) throw new Error("That category is inactive. Choose another or reactivate it in Settings.");
 
   const expense = await prisma.expense.create({
     data: {
       categoryId,
       amount: new Decimal(amount.toString()),
       date,
-      paymentMethod,
+      paymentMethod: paymentMethod as PaymentMethod,
+      status: status as ExpenseStatus,
       description: description || null,
       attachmentUrl: attachmentUrl || null,
       createdById: session.user.id,
@@ -171,23 +186,25 @@ export async function createExpense({
     },
   });
 
-  // Create audit log
-  await prisma.auditLog.create({
-    data: {
-      userId: session.user.id,
-      action: "created",
-      affectedType: "Expense",
-      affectedId: expense.id,
-      newValue: {
-        amount: expense.amount.toString(),
-        categoryId: expense.categoryId,
-        paymentMethod: expense.paymentMethod,
-      },
+  await logAudit({
+    actor: { id: session.user.id, userId: session.user.userId, name: session.user.name, role: session.user.role },
+    action: "created",
+    title: "Created Expense",
+    module: "Expenses",
+    entityType: "Expense",
+    entityId: expense.id,
+    description: `Created expense: ${expense.category.name}, ${npr(expense.amount.toString())} (${expense.paymentMethod.replace(/_/g, " ")}, ${expense.status})`,
+    next: {
+      category: expense.category.name,
+      amount: Number(expense.amount),
+      paymentMethod: expense.paymentMethod,
+      status: expense.status,
+      description: expense.description,
     },
   });
 
   revalidatePath("/expenses");
-  return expense;
+  return { id: expense.id };
 }
 
 export async function updateExpense({
@@ -209,6 +226,7 @@ export async function updateExpense({
   description?: string;
   attachmentUrl?: string;
 }) {
+  await assertPermission("expenses.edit");
   const session = await auth();
   if (!session) throw new Error("Unauthorized");
 
@@ -218,6 +236,7 @@ export async function updateExpense({
       categoryId: true,
       amount: true,
       paymentMethod: true,
+      status: true,
       description: true,
       attachmentUrl: true,
     },
@@ -230,7 +249,8 @@ export async function updateExpense({
       categoryId,
       amount: new Decimal(amount.toString()),
       date,
-      paymentMethod,
+      paymentMethod: paymentMethod as PaymentMethod,
+      status: status as ExpenseStatus,
       description: description || null,
       attachmentUrl: attachmentUrl || null,
     },
@@ -240,58 +260,75 @@ export async function updateExpense({
     },
   });
 
-  // Create audit log
-  await prisma.auditLog.create({
-    data: {
-      userId: session.user.id,
+  {
+    const [oldCat, newCat] = await Promise.all([
+      prisma.expenseCategory.findUnique({ where: { id: existing.categoryId }, select: { name: true } }),
+      prisma.expenseCategory.findUnique({ where: { id: updated.categoryId }, select: { name: true } }),
+    ]);
+    const before = {
+      category: oldCat?.name ?? existing.categoryId,
+      amount: Number(existing.amount),
+      paymentMethod: existing.paymentMethod,
+      status: existing.status,
+      description: existing.description,
+    };
+    const after = {
+      category: newCat?.name ?? updated.categoryId,
+      amount: Number(updated.amount),
+      paymentMethod: updated.paymentMethod,
+      status: updated.status,
+      description: updated.description,
+    };
+    const changes = (Object.keys(after) as (keyof typeof after)[])
+      .filter((k) => before[k] !== after[k])
+      .map((k) => `${k}: ${before[k] ?? "-"} -> ${after[k] ?? "-"}`);
+    await logAudit({
+      actor: { id: session.user.id, userId: session.user.userId, name: session.user.name, role: session.user.role },
       action: "updated",
-      affectedType: "Expense",
-      affectedId: id,
-      previousValue: {
-        categoryId: existing.categoryId,
-        amount: existing.amount.toString(),
-        paymentMethod: existing.paymentMethod,
-      },
-      newValue: {
-        categoryId: updated.categoryId,
-        amount: updated.amount.toString(),
-        paymentMethod: updated.paymentMethod,
-      },
-    },
-  });
+      title: "Edited Expense",
+      module: "Expenses",
+      entityType: "Expense",
+      entityId: id,
+      description: `Edited expense (${after.category}, ${npr(after.amount)})${changes.length ? ": " + changes.join("; ") : ""}`,
+      previous: before,
+      next: after,
+    });
+  }
 
   revalidatePath("/expenses");
-  return updated;
+  return { id: updated.id };
 }
 
 export async function deleteExpense(id: string) {
+  await assertPermission("expenses.delete");
   const session = await auth();
   if (!session) throw new Error("Unauthorized");
 
-  // Only Owner can delete
-  if (session.user.role !== "OWNER") {
-    throw new Error("Only Owner can delete expenses");
-  }
 
   const expense = await prisma.expense.findUnique({
     where: { id },
   });
   if (!expense) throw new Error("Expense not found");
 
-  // Create audit log before deletion
-  await prisma.auditLog.create({
-    data: {
-      userId: session.user.id,
+  {
+    const cat = await prisma.expenseCategory.findUnique({ where: { id: expense.categoryId }, select: { name: true } });
+    await logAudit({
+      actor: { id: session.user.id, userId: session.user.userId, name: session.user.name, role: session.user.role },
       action: "deleted",
-      affectedType: "Expense",
-      affectedId: id,
-      previousValue: {
-        amount: expense.amount.toString(),
-        categoryId: expense.categoryId,
+      title: "Deleted Expense",
+      module: "Expenses",
+      entityType: "Expense",
+      entityId: id,
+      description: `Deleted expense: ${cat?.name ?? "-"}, ${npr(expense.amount.toString())}`,
+      previous: {
+        category: cat?.name ?? expense.categoryId,
+        amount: Number(expense.amount),
         paymentMethod: expense.paymentMethod,
+        status: expense.status,
+        description: expense.description,
       },
-    },
-  });
+    });
+  }
 
   await prisma.expense.delete({
     where: { id },
@@ -301,13 +338,10 @@ export async function deleteExpense(id: string) {
 }
 
 export async function createExpenseCategory(name: string) {
+  await assertPermission("expenses.add");
   const session = await auth();
   if (!session) throw new Error("Unauthorized");
 
-  // Only Owner can create categories
-  if (session.user.role !== "OWNER") {
-    throw new Error("Only Owner can create expense categories");
-  }
 
   const category = await prisma.expenseCategory.create({
     data: { name },
@@ -315,4 +349,34 @@ export async function createExpenseCategory(name: string) {
 
   revalidatePath("/expenses");
   return category;
+}
+
+async function appOrigin() {
+  const hdrs = await headers();
+  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host");
+  const proto = hdrs.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
+  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? `${proto}://${host}`;
+}
+
+export async function getExpenseShareUrl(id: string) {
+  await assertPermission("expenses.view");
+  const session = await auth();
+  if (!session) throw new Error("Unauthorized");
+  return `${await appOrigin()}/api/expense/${id}?t=${expenseToken(id)}`;
+}
+
+export async function getExpenseReportShareUrl(filters: ExpenseReportFilters) {
+  await assertPermission("expenses.view");
+  const session = await auth();
+  if (!session) throw new Error("Unauthorized");
+  const f = {
+    from: filters.from ?? "",
+    to: filters.to ?? "",
+    category: filters.category ?? "",
+    method: filters.method ?? "",
+    status: filters.status ?? "",
+    q: filters.q ?? "",
+  };
+  const qs = new URLSearchParams({ ...f, t: expenseReportToken(f) });
+  return `${await appOrigin()}/api/expense-report?${qs.toString()}`;
 }

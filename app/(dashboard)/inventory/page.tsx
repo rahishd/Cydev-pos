@@ -1,3 +1,4 @@
+import { requirePermission } from "@/lib/access";
 import { getInventoryPageData } from "./actions";
 import { InventoryClient } from "@/components/inventory/InventoryClient";
 
@@ -13,6 +14,7 @@ type SearchParams = Promise<{
 export default async function InventoryPage(props: {
   searchParams: SearchParams;
 }) {
+  await requirePermission("inventory.view");
   const searchParams = await props.searchParams;
   const data = await getInventoryPageData(
     searchParams.search,

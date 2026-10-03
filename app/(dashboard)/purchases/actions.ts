@@ -1,5 +1,9 @@
 "use server";
 
+import { assertPermission } from "@/lib/access";
+import { logAudit, npr } from "@/lib/audit";
+import { getSettings } from "@/lib/settings";
+import { formatNumber } from "@/lib/settings-schema";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 
@@ -9,6 +13,7 @@ export async function getPurchasesPageData(
   status?: string,
   paymentStatus?: string
 ) {
+  await assertPermission("purchases.view");
   const whereClause: any = {};
 
   if (search) {
@@ -104,6 +109,7 @@ export async function getPurchasesPageData(
 }
 
 export async function getPurchaseDetails(purchaseId: string) {
+  await assertPermission("purchases.view");
   const purchase = await prisma.purchase.findUnique({
     where: { id: purchaseId },
     select: {
@@ -179,16 +185,20 @@ export async function createPurchase(
   supplierInvoiceRef?: string,
   notes?: string
 ) {
+  const access = await assertPermission("purchases.create");
   // Generate purchase number
   const lastPurchase = await prisma.purchase.findFirst({
     orderBy: { createdAt: "desc" },
     select: { purchaseNo: true },
   });
 
-  const lastNum = lastPurchase?.purchaseNo
-    ? parseInt(lastPurchase.purchaseNo.replace("PO-", ""))
-    : 0;
-  const newPurchaseNo = `PO-${String(lastNum + 1).padStart(6, "0")}`;
+  const purchaseSettings = (await getSettings()).purchases;
+  const lastNum = parseInt(/(\d+)$/.exec(lastPurchase?.purchaseNo ?? "")?.[1] ?? "0", 10) || 0;
+  const newPurchaseNo = formatNumber(
+    String(purchaseSettings.prefix ?? "PUR-"),
+    Math.max(lastNum + 1, Number(purchaseSettings.startingNumber) || 1),
+    Number(purchaseSettings.numberDigits) || 6
+  );
 
   // Calculate totals
   let subtotal = 0;
@@ -217,7 +227,7 @@ export async function createPurchase(
       otherCosts: new Decimal(otherCosts),
       paidAmount: new Decimal(0),
       status: "DRAFT",
-      createdById: "system", // Will be replaced with actual user ID
+      createdById: access.id,
       items: {
         create: purchaseItems.map((item) => ({
           productVariantId: item.productVariantId,
@@ -229,14 +239,42 @@ export async function createPurchase(
     select: { id: true, purchaseNo: true },
   });
 
+  const supplier = await prisma.supplier.findUnique({ where: { id: supplierId }, select: { name: true } });
+  await logAudit({
+    actor: access,
+    action: "created",
+    title: "Created Purchase",
+    module: "Purchases",
+    entityType: "Purchase",
+    entityId: purchase.id,
+    description: `Created purchase ${purchase.purchaseNo} from ${supplier?.name ?? "supplier"}: ${items.length} item${items.length === 1 ? "" : "s"}, total ${npr(total)}`,
+    next: { purchaseNo: purchase.purchaseNo, supplier: supplier?.name, items: items.length, total },
+  });
+
   return purchase;
 }
 
 export async function updatePurchaseStatus(purchaseId: string, status: string) {
+  const access = await assertPermission(status === "CANCELLED" ? "purchases.cancel" : "purchases.edit");
+  const before = await prisma.purchase.findUnique({
+    where: { id: purchaseId },
+    select: { purchaseNo: true, status: true },
+  });
   const purchase = await prisma.purchase.update({
     where: { id: purchaseId },
     data: { status },
     select: { id: true, status: true },
+  });
+  await logAudit({
+    actor: access,
+    action: status === "CANCELLED" ? "cancelled" : "status_changed",
+    title: status === "CANCELLED" ? "Cancelled Purchase" : "Changed Purchase Status",
+    module: "Purchases",
+    entityType: "Purchase",
+    entityId: purchaseId,
+    description: `${before?.purchaseNo ?? "Purchase"}: status ${before?.status ?? "-"} -> ${status}`,
+    previous: { status: before?.status },
+    next: { status },
   });
   return purchase;
 }
@@ -247,9 +285,10 @@ export async function recordPayment(
   method: string,
   userId: string
 ) {
+  const access = await assertPermission("purchases.edit");
   const purchase = await prisma.purchase.findUnique({
     where: { id: purchaseId },
-    select: { total: true, paidAmount: true },
+    select: { total: true, paidAmount: true, purchaseNo: true },
   });
 
   if (!purchase) throw new Error("Purchase not found");
@@ -269,6 +308,17 @@ export async function recordPayment(
     where: { id: purchaseId },
     data: { paidAmount: new Decimal(newPaidAmount) },
   });
+  await logAudit({
+    actor: access,
+    action: "payment",
+    title: "Purchase Payment Made",
+    module: "Purchases",
+    entityType: "Purchase",
+    entityId: purchaseId,
+    description: `Paid ${npr(amount)} (${method.replace(/_/g, " ")}) on ${purchase.purchaseNo}. Paid ${npr(newPaidAmount)} of ${npr(Number(purchase.total))}`,
+    previous: { paid: Number(purchase.paidAmount) },
+    next: { paid: newPaidAmount },
+  });
 
   return { newPaidAmount };
 }
@@ -278,6 +328,7 @@ export async function receiveGoods(
   receivedItems: Array<{ itemId: string; receivedQuantity: number }>,
   userId: string
 ) {
+  const access = await assertPermission("purchases.receive");
   const purchase = await prisma.purchase.findUnique({
     where: { id: purchaseId },
     select: {
@@ -307,7 +358,7 @@ export async function receiveGoods(
           quantityChange: received.receivedQuantity,
           reason: `Purchase received`,
           referenceId: purchaseId,
-          createdById: userId,
+          createdById: access.id,
         },
       });
 
@@ -334,6 +385,18 @@ export async function receiveGoods(
     data: {
       status: allReceived ? "RECEIVED" : "PARTIALLY_RECEIVED",
     },
+  });
+
+  const units = receivedItems.reduce((sum, r) => sum + (r.receivedQuantity > 0 ? r.receivedQuantity : 0), 0);
+  await logAudit({
+    actor: access,
+    action: "received",
+    title: allReceived ? "Purchase Received" : "Partial Purchase Received",
+    module: "Purchases",
+    entityType: "Purchase",
+    entityId: purchaseId,
+    description: `${allReceived ? "Received" : "Partially received"} ${purchase.purchaseNo}: ${units} unit${units === 1 ? "" : "s"} added to stock`,
+    next: { status: allReceived ? "RECEIVED" : "PARTIALLY_RECEIVED", units },
   });
 
   return { status: allReceived ? "RECEIVED" : "PARTIALLY_RECEIVED" };

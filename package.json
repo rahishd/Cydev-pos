@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:audit-lock": "tsx prisma/audit-append-only.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -17,6 +19,8 @@
     "@prisma/client": "^6.19.3",
     "@vercel/blob": "^2.8.0",
     "bcryptjs": "^3.0.3",
+    "jspdf": "^4.2.1",
+    "nepali-date-converter": "^3.4.0",
     "next": "16.3.7",
     "next-auth": "^5.0.0-beta.32",
     "prisma": "^6.19.3",

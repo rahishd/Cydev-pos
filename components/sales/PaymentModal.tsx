@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Card } from "@/components/ui/Card";
 import { formatCurrency } from "@/lib/date-utils";
+import { useSettings } from "@/components/providers/SettingsProvider";
 import { searchCustomersByNameOrPhone } from "@/app/(dashboard)/sales/actions";
 
 type Customer = {
@@ -35,13 +36,28 @@ export function PaymentModal({
   customer: Customer | null;
   onComplete: (data: any) => void;
 }) {
+  const settings = useSettings();
+  const enabledMethods: Record<string, boolean> = {
+    CASH: Boolean(settings.payments.cash),
+    ESEWA: Boolean(settings.payments.esewa),
+    KHALTI: Boolean(settings.payments.khalti),
+    FONEPAY: Boolean(settings.payments.fonepay),
+    BANK_TRANSFER: Boolean(settings.payments.bankTransfer),
+    CARD: Boolean(settings.payments.card),
+  };
+  const preferred = String(settings.sales.defaultPaymentMethod);
+  const defaultMethod = enabledMethods[preferred]
+    ? preferred
+    : Object.keys(enabledMethods).find((m) => enabledMethods[m]) ?? "OTHER";
+  const dueDays = Number(settings.customers.creditDueDays) || 30;
+
   const [deliveryMethod, setDeliveryMethod] = useState<"IN_SHOP" | "COD">("IN_SHOP");
   const [paymentMode, setPaymentMode] = useState<"single" | "split">("single");
   const [payments, setPayments] = useState<PaymentPart[]>([
-    { method: "CASH", amount: total },
+    { method: defaultMethod, amount: total },
   ]);
   const [dueDate, setDueDate] = useState(
-    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+    new Date(Date.now() + dueDays * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
   );
   const [deliveryAddress, setDeliveryAddress] = useState(customer?.address || "");
   const [deliveryPhone, setDeliveryPhone] = useState(customer?.phone || "");
@@ -84,7 +100,7 @@ export function PaymentModal({
   };
 
   const handleAddPayment = () => {
-    setPayments([...payments, { method: "CASH", amount: Math.max(0, balance) }]);
+    setPayments([...payments, { method: defaultMethod, amount: Math.max(0, balance) }]);
   };
 
   const handleUpdatePayment = (idx: number, updates: Partial<PaymentPart>) => {
@@ -122,6 +138,8 @@ export function PaymentModal({
       deliveryMethod,
       deliveryAddress: deliveryMethod === "COD" ? deliveryAddress : undefined,
       deliveryPhone: deliveryMethod === "COD" ? deliveryPhone : undefined,
+      customerName: customerName.trim() || undefined,
+      customerPhone: customerPhone.trim() || undefined,
       dueDate: payments.some((p) => p.method === "CREDIT")
         ? new Date(dueDate)
         : undefined,
@@ -262,13 +280,18 @@ export function PaymentModal({
                 onChange={(e) => handleUpdatePayment(idx, { method: e.target.value })}
                 className="flex-1"
               >
-                <option value="CASH">Cash</option>
-                <option value="ESEWA">eSewa</option>
-                <option value="KHALTI">Khalti</option>
-                <option value="FONEPAY">Fonepay</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="CARD">Card</option>
-                {customer && <option value="CREDIT">Credit</option>}
+                {enabledMethods.CASH && <option value="CASH">Cash</option>}
+                {enabledMethods.ESEWA && <option value="ESEWA">eSewa</option>}
+                {enabledMethods.KHALTI && <option value="KHALTI">Khalti</option>}
+                {enabledMethods.FONEPAY && <option value="FONEPAY">Fonepay</option>}
+                {enabledMethods.BANK_TRANSFER && <option value="BANK_TRANSFER">Bank Transfer</option>}
+                {enabledMethods.CARD && <option value="CARD">Card</option>}
+                {settings.payments.credit &&
+                  settings.customers.creditEnabled &&
+                  (!settings.sales.requireCustomerForCredit ||
+                    customer ||
+                    customerName.trim() ||
+                    customerPhone.trim()) && <option value="CREDIT">Credit</option>}
                 <option value="OTHER">Other</option>
               </Select>
               <Input

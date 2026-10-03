@@ -1,3 +1,4 @@
+import { requirePermission } from "@/lib/access";
 import { getSalesHistory } from "./actions";
 import { SalesClient } from "@/components/sales/SalesClient";
 
@@ -13,14 +14,21 @@ type SearchParams = Promise<{
 export default async function SalesPage(props: {
   searchParams: SearchParams;
 }) {
+  const access = await requirePermission("sales.create", "sales.history", "sales.return", "sales.exchange");
+  const allowedTabs = [
+    access.can("sales.create") && "pos",
+    access.can("sales.history") && "history",
+    (access.can("sales.return") || access.can("sales.exchange")) && "returns",
+  ].filter(Boolean) as string[];
   const searchParams = await props.searchParams;
 
-  const tab = searchParams.tab || "pos";
+  const requestedTab = searchParams.tab || "pos";
+  const tab = allowedTabs.includes(requestedTab) ? requestedTab : allowedTabs[0];
   const search = searchParams.search || "";
   const customerId = searchParams.customer || "";
   const paymentMethod = searchParams.method || "";
 
-  let salesHistory = [];
+  let salesHistory: any[] = [];
   if (tab === "history") {
     salesHistory = await getSalesHistory(search, customerId, paymentMethod);
   }
@@ -33,6 +41,7 @@ export default async function SalesPage(props: {
       </div>
 
       <SalesClient
+        allowedTabs={allowedTabs}
         initialTab={tab}
         initialSearch={search}
         initialCustomerId={customerId}

@@ -16,6 +16,7 @@ import {
   createExpenseCategory,
   ExpensesPageData,
 } from "@/app/(dashboard)/expenses/actions";
+import { ExpenseShareModal, type ShareTarget } from "./ExpenseShareModal";
 
 const PAYMENT_METHODS = [
   "CASH",
@@ -70,6 +71,7 @@ export default function ExpensesClient({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -137,6 +139,37 @@ export default function ExpensesClient({
     dateFrom,
     dateTo,
   ]);
+
+  const handleReportClick = () => {
+    const fmt = (d: string) =>
+      new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    const catName = categories.find((c) => c.id === selectedCategory)?.name;
+    const filterParts = [
+      catName && `Category: ${catName}`,
+      selectedPaymentMethod && `Method: ${getPaymentMethodLabel(selectedPaymentMethod)}`,
+      selectedStatus && `Status: ${selectedStatus}`,
+      search && `Search: "${search}"`,
+    ].filter(Boolean) as string[];
+    setShareTarget({
+      kind: "report",
+      data: {
+        expenses: filteredExpenses,
+        periodLabel:
+          dateFrom || dateTo
+            ? `${dateFrom ? fmt(dateFrom) : "Start"} - ${dateTo ? fmt(dateTo) : "Today"}`
+            : "All dates",
+        filterLabel: filterParts.join("  |  ") || undefined,
+      },
+      filters: {
+        from: dateFrom,
+        to: dateTo,
+        category: selectedCategory,
+        method: selectedPaymentMethod,
+        status: selectedStatus,
+        q: search,
+      },
+    });
+  };
 
   const handleAddClick = () => {
     setEditingId(null);
@@ -355,6 +388,14 @@ export default function ExpensesClient({
             </div>
 
             <Button
+              variant="ghost"
+              onClick={handleReportClick}
+              className="px-4 py-2 rounded-lg font-medium text-sm"
+            >
+              Report (PDF)
+            </Button>
+
+            <Button
               onClick={handleAddClick}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium text-sm"
             >
@@ -484,6 +525,12 @@ export default function ExpensesClient({
                   <td className="py-3 px-4">
                     <div className="flex gap-2">
                       <button
+                        onClick={() => setShareTarget({ kind: "voucher", expense })}
+                        className="text-orange-600 hover:text-orange-700 text-sm font-medium"
+                      >
+                        Share
+                      </button>
+                      <button
                         onClick={() => handleEditClick(expense)}
                         className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                       >
@@ -514,9 +561,15 @@ export default function ExpensesClient({
         </table>
       </Card>
 
+      <ExpenseShareModal
+        key={shareTarget ? (shareTarget.kind === "voucher" ? shareTarget.expense.id : "report") : "none"}
+        target={shareTarget}
+        onClose={() => setShareTarget(null)}
+      />
+
       {/* Add/Edit Drawer */}
       <Drawer
-        isOpen={isDrawerOpen}
+        open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         title={editingId ? "Edit Expense" : "Add Expense"}
       >

@@ -8,12 +8,14 @@ import { ReturnsExchangesTab } from "./ReturnsExchangesTab";
 import { Button } from "@/components/ui/Button";
 
 export function SalesClient({
+  allowedTabs,
   initialTab,
   initialSearch,
   initialCustomerId,
   initialPaymentMethod,
   initialSalesHistory,
 }: {
+  allowedTabs: string[];
   initialTab: string;
   initialSearch: string;
   initialCustomerId: string;
@@ -23,11 +25,11 @@ export function SalesClient({
   const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState(initialTab);
 
-  const tabs = [
+  const tabs = ([
     { id: "pos", label: "New Sale", icon: "💳" },
     { id: "history", label: "Sales History", icon: "📋" },
     { id: "returns", label: "Returns & Exchanges", icon: "↩️" },
-  ];
+  ]).filter((t) => allowedTabs.includes(t.id));
 
   return (
     <div className="space-y-4">

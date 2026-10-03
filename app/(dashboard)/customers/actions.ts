@@ -1,9 +1,13 @@
 "use server";
 
+import { assertPermission } from "@/lib/access";
+import { logAudit, npr } from "@/lib/audit";
+import { getSettings } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 
 export async function getCustomersPageData(search?: string, status?: string, hasOutstanding?: boolean) {
+  await assertPermission("customers.view");
   const whereClause: any = {};
 
   if (search) {
@@ -99,6 +103,7 @@ export async function getCustomersPageData(search?: string, status?: string, has
 }
 
 export async function getCustomerDetails(customerId: string) {
+  await assertPermission("customers.history", "customers.view");
   const customer = await prisma.customer.findUnique({
     where: { id: customerId },
     select: {
@@ -225,6 +230,11 @@ export async function createCustomer(
   address?: string,
   notes?: string
 ) {
+  const access = await assertPermission("customers.add");
+  if (!name.trim()) throw new Error("Customer name is required");
+  if ((await getSettings()).customers.requirePhone && !phone?.trim()) {
+    throw new Error("A phone number is required for customers (see Settings > Customers).");
+  }
   const customer = await prisma.customer.create({
     data: {
       name,
@@ -234,6 +244,15 @@ export async function createCustomer(
       notes: notes || null,
     },
     select: { id: true, name: true },
+  });
+  await logAudit({
+    actor: access,
+    action: "created",
+    title: "Created Customer",
+    module: "Customers",
+    entityType: "Customer",
+    entityId: customer.id,
+    description: `Created customer "${customer.name}"`,
   });
 
   return customer;
@@ -247,6 +266,7 @@ export async function updateCustomer(
   address?: string,
   notes?: string
 ) {
+  const access = await assertPermission("customers.edit");
   const customer = await prisma.customer.update({
     where: { id: customerId },
     data: {
@@ -258,6 +278,18 @@ export async function updateCustomer(
     },
     select: { id: true, name: true },
   });
+  const changedFields = Object.entries({ name, phone, email, address, notes })
+    .filter(([, v]) => v)
+    .map(([k]) => k);
+  await logAudit({
+    actor: access,
+    action: "updated",
+    title: "Edited Customer",
+    module: "Customers",
+    entityType: "Customer",
+    entityId: customer.id,
+    description: `Edited customer "${customer.name}" (changed: ${changedFields.join(", ") || "nothing"})`,
+  });
 
   return customer;
 }
@@ -268,6 +300,7 @@ export async function recordCustomerPayment(
   amount: number,
   method: string
 ) {
+  const access = await assertPermission("customers.credit");
   const credit = await prisma.customerCredit.findUnique({
     where: { id: creditId },
     select: { amount: true, amountPaid: true },
@@ -287,6 +320,17 @@ export async function recordCustomerPayment(
     where: { id: creditId },
     data: { amountPaid: new Decimal(newAmountPaid) },
     select: { id: true, amountPaid: true },
+  });
+  await logAudit({
+    actor: access,
+    action: "payment",
+    title: "Customer Payment Received",
+    module: "Customers",
+    entityType: "CustomerCredit",
+    entityId: creditId,
+    description: `Received ${npr(amount)} (${method.replace(/_/g, " ")}) against customer credit. Paid ${npr(newAmountPaid)} of ${npr(totalAmount)}`,
+    previous: { paid: Number(credit.amountPaid) },
+    next: { paid: newAmountPaid },
   });
 
   return updated;

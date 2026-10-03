@@ -135,12 +135,17 @@ export function NewSaleFlow({ staffId, staffName }: { staffId: string; staffName
         paymentData.dueDate,
         paymentData.deliveryMethod,
         paymentData.deliveryAddress,
-        paymentData.deliveryPhone
+        paymentData.deliveryPhone,
+        paymentData.customerName,
+        paymentData.customerPhone
       );
 
       setLastInvoice({
         ...paymentData,
         ...result,
+        customer: paymentData.customerName || paymentData.customerPhone
+          ? { name: paymentData.customerName, phone: paymentData.customerPhone }
+          : null,
         items: cart,
         subtotal,
         discount,

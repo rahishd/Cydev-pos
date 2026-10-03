@@ -12,7 +12,9 @@
       "Bash(git commit -m 'feat: add Expenses module with full CRUD, file uploads, and filtering *)",
       "Bash(git commit -m 'fix: handle missing userId in stock movement creation for products *)",
       "PowerShell(cd \"C:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\Cydev POS\"; $env:PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION='yes'; npx prisma migrate reset --force)",
-      "PowerShell(Test-NetConnection -ComputerName ep-orange-scene-b5civ0aa-pooler.c-7.us-east-2.aws.neon.tech -Port 5432 -InformationLevel Detailed)"
+      "PowerShell(Test-NetConnection -ComputerName ep-orange-scene-b5civ0aa-pooler.c-7.us-east-2.aws.neon.tech -Port 5432 -InformationLevel Detailed)",
+      "Bash(npx tsc *)",
+      "Bash(node -)"
     ]
   }
 }

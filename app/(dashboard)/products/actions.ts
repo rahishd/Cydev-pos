@@ -1,10 +1,13 @@
 "use server";
 
+import { assertPermission } from "@/lib/access";
+import { logAudit, npr } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 
 export async function getProductsPageData() {
+  await assertPermission("products.view");
   const [products, categories, brands, suppliers] = await Promise.all([
     prisma.product.findMany({
       include: {
@@ -103,6 +106,7 @@ export interface ProductInput {
 }
 
 export async function createProduct(input: ProductInput) {
+  const access = await assertPermission("products.add");
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
   const userId = session.user.id;
@@ -175,6 +179,23 @@ export async function createProduct(input: ProductInput) {
     }
   });
 
+  await logAudit({
+    actor: access,
+    action: "created",
+    title: "Created Product",
+    module: "Products",
+    entityType: "Product",
+    entityId: input.sku,
+    description: `Created product "${input.name}" (${input.sku}) with ${variants.length} variant${variants.length === 1 ? "" : "s"}, selling price ${npr(input.sellingPrice)}`,
+    next: {
+      name: input.name,
+      sku: input.sku,
+      purchasePrice: Number(input.purchasePrice),
+      sellingPrice: Number(input.sellingPrice),
+      variants: variants.length,
+    },
+  });
+
   revalidatePath("/products");
 }
 
@@ -182,6 +203,7 @@ export async function updateProduct(
   id: string,
   input: ProductInput & { variants: (VariantInput & { delete?: boolean })[] }
 ) {
+  const access = await assertPermission("products.edit");
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
   const userId = session.user.id;
@@ -191,6 +213,40 @@ export async function updateProduct(
   const userExists = await prisma.user.findUnique({ where: { id: userId } });
   if (!userExists) {
     throw new Error("User account not found in database. Please log out and log back in.");
+  }
+
+  const before = await prisma.product.findUnique({
+    where: { id },
+    select: {
+      name: true,
+      sku: true,
+      status: true,
+      categoryId: true,
+      brandId: true,
+      imageUrl: true,
+      purchasePrice: true,
+      sellingPrice: true,
+      discountPrice: true,
+      variants: {
+        select: { id: true, sku: true, size: true, color: true, purchasePrice: true, sellingPrice: true, status: true },
+      },
+    },
+  });
+  if (before) {
+    const num = (v: unknown) => (v == null ? null : Number(v));
+    const pricesChanged =
+      num(before.purchasePrice) !== num(input.purchasePrice) ||
+      num(before.sellingPrice) !== num(input.sellingPrice) ||
+      num(before.discountPrice) !== num(input.discountPrice ?? null) ||
+      input.variants.some((v) => {
+        const old = before.variants.find((b) => b.id === (v as { id?: string }).id);
+        return (
+          !old ||
+          num(old.purchasePrice) !== num((v as { purchasePrice?: unknown }).purchasePrice) ||
+          num(old.sellingPrice) !== num((v as { sellingPrice?: unknown }).sellingPrice)
+        );
+      });
+    if (pricesChanged) await assertPermission("products.edit_price");
   }
 
   await prisma.$transaction(async (tx) => {
@@ -262,25 +318,106 @@ export async function updateProduct(
     }
   });
 
+  if (before) {
+    const num = (v: unknown) => (v == null ? null : Number(v));
+    const vLabel = (v: { size?: string | null; color?: string | null; sku?: string | null }) =>
+      [v.size, v.color].filter(Boolean).join(" / ") || v.sku || "variant";
+
+    const priceLines: string[] = [];
+    const priceBefore: Record<string, unknown> = {};
+    const priceAfter: Record<string, unknown> = {};
+    const track = (label: string, was: unknown, now: unknown) => {
+      if (num(was) !== num(now)) {
+        priceLines.push(`${label}: ${npr(num(was) ?? 0)} -> ${npr(num(now) ?? 0)}`);
+        priceBefore[label] = num(was);
+        priceAfter[label] = num(now);
+      }
+    };
+    track(`${input.name} selling price`, before.sellingPrice, input.sellingPrice);
+    track(`${input.name} purchase price`, before.purchasePrice, input.purchasePrice);
+    for (const v of input.variants) {
+      const old = before.variants.find((b) => b.id === v.id);
+      if (!old || v.delete) continue;
+      track(`${input.name} (${vLabel(v)}) selling price`, old.sellingPrice, v.sellingPrice);
+      track(`${input.name} (${vLabel(v)}) purchase price`, old.purchasePrice, v.purchasePrice);
+    }
+    if (priceLines.length) {
+      await logAudit({
+        actor: access,
+        action: "price_changed",
+        title: "Changed Price",
+        module: "Products",
+        entityType: "Product",
+        entityId: id,
+        description: priceLines.join("; "),
+        previous: priceBefore,
+        next: priceAfter,
+      });
+    }
+
+    const other: string[] = [];
+    if (before.name !== input.name) other.push(`name: ${before.name} -> ${input.name}`);
+    if (before.sku !== input.sku) other.push(`SKU: ${before.sku} -> ${input.sku}`);
+    if (before.status !== input.status) other.push(`status: ${before.status} -> ${input.status}`);
+    if ((before.categoryId ?? "") !== (input.categoryId ?? "")) other.push("category changed");
+    if ((before.brandId ?? "") !== (input.brandId ?? "")) other.push("brand changed");
+    if ((before.imageUrl ?? "") !== (input.imageUrl ?? "")) other.push("image changed");
+    for (const v of input.variants) {
+      if (!v.id) other.push(`variant added: ${vLabel(v)}`);
+      else if (v.delete) other.push(`variant removed: ${vLabel(before.variants.find((b) => b.id === v.id) ?? v)}`);
+      else {
+        const old = before.variants.find((b) => b.id === v.id);
+        if (old && (old.sku !== v.sku || (old.size ?? "") !== (v.size ?? "") || (old.color ?? "") !== (v.color ?? ""))) {
+          other.push(`variant edited: ${vLabel(old)} -> ${vLabel(v)}`);
+        }
+      }
+    }
+    if (other.length || !priceLines.length) {
+      await logAudit({
+        actor: access,
+        action: "updated",
+        title: "Edited Product",
+        module: "Products",
+        entityType: "Product",
+        entityId: id,
+        description: `Edited product "${input.name}"${other.length ? ": " + other.join("; ") : ""}`,
+      });
+    }
+  }
+
   revalidatePath("/products");
 }
 
 export async function toggleProductStatus(id: string) {
+  const access = await assertPermission("products.delete");
   const product = await prisma.product.findUnique({
     where: { id },
-    select: { status: true },
+    select: { status: true, name: true, sku: true },
   });
   if (!product) throw new Error("Product not found");
 
+  const nextStatus = product.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
   await prisma.product.update({
     where: { id },
-    data: { status: product.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" },
+    data: { status: nextStatus },
+  });
+  await logAudit({
+    actor: access,
+    action: nextStatus === "ACTIVE" ? "activated" : "deactivated",
+    title: nextStatus === "ACTIVE" ? "Reactivated Product" : "Deactivated Product",
+    module: "Products",
+    entityType: "Product",
+    entityId: id,
+    description: `${nextStatus === "ACTIVE" ? "Reactivated" : "Deactivated"} product "${product.name}" (${product.sku})`,
+    previous: { status: product.status },
+    next: { status: nextStatus },
   });
 
   revalidatePath("/products");
 }
 
 export async function deleteProduct(id: string) {
+  const access = await assertPermission("products.delete");
   const hasSales = await prisma.saleItem.count({
     where: { productVariant: { productId: id } },
   });
@@ -288,18 +425,33 @@ export async function deleteProduct(id: string) {
     throw new Error("Cannot delete a product that has sales history. Deactivate it instead.");
   }
 
+  const gone = await prisma.product.findUnique({ where: { id }, select: { name: true, sku: true } });
   await prisma.product.delete({ where: { id } });
+  await logAudit({
+    actor: access,
+    action: "deleted",
+    title: "Deleted Product",
+    module: "Products",
+    entityType: "Product",
+    entityId: id,
+    description: `Deleted product "${gone?.name ?? id}" (${gone?.sku ?? "-"})`,
+    previous: gone ?? undefined,
+  });
   revalidatePath("/products");
 }
 
 export async function createCategory(name: string) {
+  const access = await assertPermission("products.add", "products.edit");
   const category = await prisma.category.create({ data: { name: name.trim() } });
+  await logAudit({ actor: access, action: "created", title: "Created Category", module: "Products", entityType: "Category", entityId: category.id, description: `Created category "${category.name}"` });
   revalidatePath("/products");
   return category;
 }
 
 export async function createBrand(name: string) {
+  const access = await assertPermission("products.add", "products.edit");
   const brand = await prisma.brand.create({ data: { name: name.trim() } });
+  await logAudit({ actor: access, action: "created", title: "Created Brand", module: "Products", entityType: "Brand", entityId: brand.id, description: `Created brand "${brand.name}"` });
   revalidatePath("/products");
   return brand;
 }
