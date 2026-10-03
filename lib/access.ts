@@ -11,6 +11,8 @@ export type Access = {
   role: "OWNER" | "STAFF";
   isOwner: boolean;
   permissions: string[];
+  /** 0 when the person has no profile photo; changes whenever the photo does, so browsers refetch it. */
+  avatarVersion: number;
   can: (permission: string) => boolean;
 };
 
@@ -24,7 +26,7 @@ export const getAccess = cache(async (): Promise<Access | null> => {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, userId: true, name: true, role: true, status: true, permissions: true },
+    select: { id: true, userId: true, name: true, role: true, status: true, permissions: true, avatarVersion: true },
   });
   if (!user || user.status !== "ACTIVE") return null;
 
@@ -37,6 +39,7 @@ export const getAccess = cache(async (): Promise<Access | null> => {
     role: user.role,
     isOwner,
     permissions: user.permissions,
+    avatarVersion: user.avatarVersion,
     can: (p: string) => isOwner || set.has(p),
   };
 });

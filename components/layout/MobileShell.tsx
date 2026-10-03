@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Icon } from "@/components/layout/Icon";
 import { NepaliCalendar } from "@/components/layout/NepaliCalendar";
 import { Weather } from "@/components/layout/Weather";
+import { Avatar } from "@/components/layout/Avatar";
 import { ActivityBell } from "@/components/layout/ActivityBell";
 import { HOME_GROUPS, canSee, pageTitle } from "@/components/layout/nav-config";
 import { logoutAction } from "@/lib/session-actions";
@@ -27,7 +28,8 @@ export function MobileHeader({
   userRole,
   userKey,
   canOpenLog,
-}: Pick<Props, "userName" | "userRole"> & { userKey: string; canOpenLog: boolean }) {
+  avatarVersion,
+}: Pick<Props, "userName" | "userRole"> & { userKey: string; canOpenLog: boolean; avatarVersion: number }) {
   const pathname = usePathname();
   const isHome = pathname === "/home";
   const { business } = useSettings();
@@ -38,9 +40,9 @@ export function MobileHeader({
     return (
       <header className={cn("relative px-4 pb-4 pt-4 text-white lg:hidden", HEADER_BG, "rounded-b-[2rem]")}>
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-lg font-bold text-orange-600">
-            {first.charAt(0).toUpperCase()}
-          </div>
+          <Link href="/profile" aria-label="My profile">
+            <Avatar id={userKey} name={userName} version={avatarVersion} className="h-11 w-11 text-lg" />
+          </Link>
           <div className="min-w-0 flex-1 leading-tight">
             <div className="truncate text-lg font-semibold">Hi, {userName.trim() || "there"}</div>
             <div className="text-xs text-white/80">
@@ -175,7 +177,11 @@ export function MobileBottomNav({ isOwner, permissions, userName }: Props) {
               ))}
             </div>
 
-            <form action={logoutAction} className="mt-5 border-t border-zinc-100 pt-4">
+            <Link href="/profile" className="mt-5 flex w-full items-center justify-center rounded-xl border border-zinc-200 py-2.5 text-sm font-semibold text-zinc-700 active:bg-zinc-50">
+              My profile &amp; photo
+            </Link>
+
+            <form action={logoutAction} className="mt-3">
               <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 py-2.5 text-sm font-semibold text-red-600 active:bg-red-50">
                 <Icon name="logout" className="h-5 w-5" />
                 Sign out ({userName.split(" ")[0]})
