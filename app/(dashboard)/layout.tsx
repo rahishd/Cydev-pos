@@ -29,8 +29,8 @@ export default async function DashboardLayout({
         logo={settings.business.logo ?? "/logo.png"}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar userName={access.name} userRole={access.role} />
-        <MobileHeader userName={access.name} userRole={access.role} />
+        <Topbar userName={access.name} userRole={access.role} userKey={access.id} canOpenLog={access.can("audit.view")} />
+        <MobileHeader userName={access.name} userRole={access.role} userKey={access.id} canOpenLog={access.can("audit.view")} />
         <main className="flex-1 p-3 pb-28 lg:p-6 lg:pb-6">{children}</main>
       </div>
       <MobileBottomNav

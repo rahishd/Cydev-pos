@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Icon } from "@/components/layout/Icon";
 import { NepaliCalendar } from "@/components/layout/NepaliCalendar";
 import { Weather } from "@/components/layout/Weather";
+import { ActivityBell } from "@/components/layout/ActivityBell";
 import { HOME_GROUPS, canSee, pageTitle } from "@/components/layout/nav-config";
 import { logoutAction } from "@/lib/session-actions";
 import { useSettings } from "@/components/providers/SettingsProvider";
@@ -21,7 +22,12 @@ type Props = {
 const HEADER_BG = "bg-gradient-to-br from-orange-500 to-orange-600";
 
 /** Phone-only top bar: a large greeting on the home screen, a compact back bar everywhere else. */
-export function MobileHeader({ userName, userRole }: Pick<Props, "userName" | "userRole">) {
+export function MobileHeader({
+  userName,
+  userRole,
+  userKey,
+  canOpenLog,
+}: Pick<Props, "userName" | "userRole"> & { userKey: string; canOpenLog: boolean }) {
   const pathname = usePathname();
   const isHome = pathname === "/home";
   const { business } = useSettings();
@@ -42,6 +48,9 @@ export function MobileHeader({ userName, userRole }: Pick<Props, "userName" | "u
             </div>
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
+          <div className="absolute right-[5.25rem] top-4">
+            <ActivityBell userKey={userKey} canOpenLog={canOpenLog} onColor />
+          </div>
           <div className="absolute right-4 top-4 flex w-[60px] flex-col items-center gap-1.5">
             <img src={logo} alt={String(business.shopName)} className="h-[60px] w-[60px] rounded-xl bg-[#ffffff] object-contain p-1" />
             <Weather className="whitespace-nowrap rounded-full bg-white/20 px-2 py-0.5 text-xs font-medium text-white" />
@@ -63,7 +72,8 @@ export function MobileHeader({ userName, userRole }: Pick<Props, "userName" | "u
       >
         <Icon name="back" className="h-6 w-6" />
       </Link>
-      <h1 className="truncate text-base font-semibold">{pageTitle(pathname)}</h1>
+      <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{pageTitle(pathname)}</h1>
+      <ActivityBell userKey={userKey} canOpenLog={canOpenLog} onColor />
     </header>
   );
 }
