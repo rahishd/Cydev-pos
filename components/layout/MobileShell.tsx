@@ -74,7 +74,7 @@ export function MobileHeader({
       >
         <Icon name="back" className="h-6 w-6" />
       </Link>
-      <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{pageTitle(pathname)}</h1>
+      <h1 className="min-w-0 flex-1 truncate text-base font-semibold !text-white">{pageTitle(pathname)}</h1>
       <ActivityBell userKey={userKey} canOpenLog={canOpenLog} onColor />
     </header>
   );

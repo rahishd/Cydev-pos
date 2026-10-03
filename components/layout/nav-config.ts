@@ -29,7 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   { id: "customers", label: "Customers", href: "/customers", icon: "customers", enabled: true, anyOf: ["customers.view"] },
   { id: "expenses", label: "Expenses", href: "/expenses", icon: "expenses", enabled: true, anyOf: ["expenses.view"] },
-  { id: "reports", label: "Reports", href: "#", icon: "reports", enabled: false, prefix: "reports" },
+  { id: "reports", label: "Reports", href: "/reports", icon: "reports", enabled: true, prefix: "reports" },
   { id: "users", label: "Users", href: "/users", icon: "users", enabled: true, ownerOnly: true },
   { id: "audit", label: "Audit Log", href: "/audit-log", icon: "audit", enabled: true, anyOf: ["audit.view"] },
   { id: "notifications", label: "Notifications", href: "/notifications", icon: "bell", enabled: true, anyOf: ["notifications.push"] },
@@ -69,7 +69,7 @@ export const HOME_GROUPS: TileGroup[] = [
     ],
   },
   { title: "Stock & Purchases", tiles: [byId("products"), byId("inventory"), byId("purchases")] },
-  { title: "Money", tiles: [byId("expenses")] },
+  { title: "Money", tiles: [byId("expenses"), byId("reports")] },
   { title: "Administration", tiles: [byId("users"), byId("audit"), byId("notifications"), byId("settings")] },
 ];
 

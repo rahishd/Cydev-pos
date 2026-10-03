@@ -110,7 +110,11 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "reports.expense", label: "Expense Reports" },
       { key: "reports.gross_profit", label: "Gross Profit Reports" },
       { key: "reports.net_profit", label: "Net Profit Reports" },
-      { key: "reports.financial", label: "Financial Reports" },
+      { key: "reports.financial", label: "Financial Reports (Daily Closing)" },
+      { key: "reports.customers", label: "Customer Reports" },
+      { key: "reports.staff", label: "Staff Activity Reports" },
+      { key: "reports.export", label: "Export Reports (PDF / CSV)" },
+      { key: "reports.print", label: "Print Reports" },
     ],
   },
   {

@@ -373,6 +373,9 @@ main {
     padding-top: 2rem;
   }
   .credit-footer {
+    background: linear-gradient(90deg, rgba(255, 149, 0, 0.1), rgba(255, 149, 0, 0.03), rgba(255, 149, 0, 0.1)), var(--color-surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     display: flex;
     height: 2rem;
     align-items: center;
@@ -480,5 +483,28 @@ main {
   .glass-table table,
   .glass-container table {
     min-width: 640px;
+  }
+}
+
+/* Printing a report: only the report itself, on white paper. */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible !important;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
   }
 }
