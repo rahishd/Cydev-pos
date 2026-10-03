@@ -18,7 +18,6 @@ interface DashboardData {
   lowStockItems: any;
   recentSales: any;
   customerCreditList: any;
-  supplierPayableList: any;
 }
 
 function KpiCard({
@@ -120,7 +119,7 @@ export default function DashboardClient({
     return <div className="text-center py-8">Loading dashboard...</div>;
   }
 
-  const { kpi, chartData, salesByPaymentMethod, topProducts, lowStockItems, recentSales, customerCreditList, supplierPayableList } = data;
+  const { kpi, chartData, salesByPaymentMethod, topProducts, lowStockItems, recentSales, customerCreditList } = data;
   const rangeLabel = {
     today: "Today",
     yesterday: "Yesterday",
@@ -217,11 +216,6 @@ export default function DashboardClient({
           label="Receivables"
           value={`Rs ${formatCurrency(kpi.receivables)}`}
           sub="Outstanding"
-        />
-        <KpiCard
-          label="Payables"
-          value={`Rs ${formatCurrency(kpi.payables)}`}
-          sub="To suppliers"
         />
       </div>
 
@@ -352,8 +346,8 @@ export default function DashboardClient({
         </table>
       </Card>
 
-      {/* Customer Receivables + Supplier Payables */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* Customer Receivables */}
+      <div className="grid grid-cols-1 gap-4">
         <Card>
           <SectionHeader title="Customer Receivables" />
           <table className="w-full text-sm">
@@ -392,36 +386,6 @@ export default function DashboardClient({
           </table>
         </Card>
 
-        <Card>
-          <SectionHeader title="Supplier Payables" />
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="pb-2 text-left text-xs font-medium text-text-muted">Supplier</th>
-                <th className="pb-2 text-left text-xs font-medium text-text-muted">PO #</th>
-                <th className="pb-2 text-right text-xs font-medium text-text-muted">Outstanding</th>
-              </tr>
-            </thead>
-            <tbody>
-              {supplierPayableList.length === 0 ? (
-                <EmptyRow cols={3} />
-              ) : (
-                supplierPayableList.map((p) => {
-                  const outstanding = Number(p.total) - Number(p.paidAmount);
-                  return (
-                    <tr key={p.id} className="border-b border-border last:border-0">
-                      <td className="py-2 font-medium text-text">{p.supplier.name}</td>
-                      <td className="py-2 font-mono text-xs text-text-muted">{p.purchaseNo}</td>
-                      <td className="py-2 text-right font-medium text-text">
-                        Rs {formatCurrency(outstanding)}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </Card>
       </div>
     </div>
   );

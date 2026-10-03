@@ -54,14 +54,12 @@ export async function getDashboardDataByDateRange({
     monthlySalesAgg,
     inventoryVariants,
     customerCreditsAgg,
-    supplierPayablesAgg,
     lowStockVariants,
     recentSales,
     paymentMethodGroups,
     topSaleItems,
     dailySales,
     customerCreditList,
-    supplierPayableList,
   ] = await Promise.all([
     prisma.sale.aggregate({
       where: { createdAt: { gte: filterStart, lt: filterEnd } },
@@ -77,10 +75,6 @@ export async function getDashboardDataByDateRange({
     }),
     prisma.customerCredit.aggregate({
       _sum: { amount: true, amountPaid: true },
-    }),
-    prisma.purchase.aggregate({
-      where: { status: { not: "CANCELLED" } },
-      _sum: { total: true, paidAmount: true },
     }),
     prisma.productVariant.findMany({
       where: { status: "ACTIVE" },
@@ -138,17 +132,6 @@ export async function getDashboardDataByDateRange({
         amountPaid: true,
         dueDate: true,
         customer: { select: { name: true, phone: true } },
-      },
-    }),
-    prisma.purchase.findMany({
-      where: { status: { not: "CANCELLED" } },
-      take: 10,
-      select: {
-        id: true,
-        purchaseNo: true,
-        total: true,
-        paidAmount: true,
-        supplier: { select: { name: true } },
       },
     }),
   ]);
@@ -243,9 +226,6 @@ export async function getDashboardDataByDateRange({
     receivables:
       Number(customerCreditsAgg._sum.amount || 0) -
       Number(customerCreditsAgg._sum.amountPaid || 0),
-    payables:
-      Number(supplierPayablesAgg._sum.total || 0) -
-      Number(supplierPayablesAgg._sum.paidAmount || 0),
   };
 
   return {
@@ -256,6 +236,5 @@ export async function getDashboardDataByDateRange({
     lowStockItems,
     recentSales,
     customerCreditList,
-    supplierPayableList,
   };
 }
