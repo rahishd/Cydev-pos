@@ -189,7 +189,7 @@ export function NewSaleFlow({ staffId, staffName }: { staffId: string; staffName
           />
 
           {cart.length > 0 && (
-            <div className="flex items-center justify-between bg-orange-50 p-3 rounded-lg">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-accent/10 p-3">
               <span className="font-semibold text-text">
                 {cart.length} item{cart.length !== 1 ? "s" : ""} in cart • Total: NPR {formatCurrency(total)}
               </span>
@@ -259,7 +259,7 @@ export function NewSaleFlow({ staffId, staffName }: { staffId: string; staffName
         {/* Product Detail Modal */}
         {selectedProduct && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card className="w-full max-w-md p-6 space-y-4">
+            <Card className="w-full max-w-md max-h-[90dvh] overflow-y-auto p-6 space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-xl font-bold text-text">{selectedProduct.name}</h3>
                 <button
@@ -368,7 +368,7 @@ export function NewSaleFlow({ staffId, staffName }: { staffId: string; staffName
 
         {/* Continue Button - Always at Bottom */}
         {cart.length > 0 && (
-          <div className="fixed bottom-6 left-6 right-6">
+          <div className="fixed inset-x-4 bottom-[6.5rem] z-40 lg:inset-x-6 lg:bottom-6">
             <Button
               onClick={() => setShowOrderReview(true)}
               className="w-full py-4 text-lg"

@@ -44,7 +44,7 @@ export function OrderReview({
 }) {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-4">
+      <Card className="w-full max-w-2xl max-h-[90vh] max-h-[90dvh] overflow-y-auto p-6 space-y-4">
         {/* Header */}
         <div className="flex justify-between items-center pb-4 border-b border-border">
           <div>
@@ -84,8 +84,8 @@ export function OrderReview({
               </div>
 
               {/* Quantity and Price Row */}
-              <div className="grid grid-cols-3 gap-3 items-end">
-                <div>
+              <div className="grid grid-cols-2 gap-3 items-end sm:grid-cols-3">
+                <div className="col-span-2 sm:col-span-1">
                   <label className="block text-xs text-text-muted mb-1">Quantity</label>
                   <div className="flex items-center gap-2">
                     <button
@@ -170,7 +170,7 @@ export function OrderReview({
         </Card>
 
         {/* Action Buttons */}
-        <div className="flex gap-3 pt-4 border-t border-border">
+        <div className="sticky -bottom-6 -mx-6 -mb-6 flex gap-3 border-t border-border bg-surface px-6 py-4">
           <Button
             variant="ghost"
             onClick={onBack}
