@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getProductsForPOS, getCustomers, createSale } from "@/app/(dashboard)/sales/actions";
+import { getProductsForPOS, getCustomers, createSale, checkPromoCode } from "@/app/(dashboard)/sales/actions";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
@@ -43,9 +43,31 @@ export function NewSaleFlow({ staffId, staffName }: { staffId: string; staffName
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
   const [tax, setTax] = useState(0);
+  const [promo, setPromo] = useState<{ code: string; discount: number } | null>(null);
 
   const subtotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity - item.discount, 0);
-  const total = subtotal - discount + tax;
+  const promoDiscount = promo?.discount ?? 0;
+  const total = subtotal - discount - promoDiscount + tax;
+
+  // The bill changed, so the promo discount may have too (or the code may no longer qualify).
+  const promoCodeApplied = promo?.code;
+  useEffect(() => {
+    if (!promoCodeApplied) return;
+    let alive = true;
+    checkPromoCode(promoCodeApplied, subtotal - discount)
+      .then((r) => {
+        if (!alive) return;
+        if (r.ok) setPromo((p) => (p && p.discount !== r.discount ? { code: p.code, discount: r.discount } : p));
+        else {
+          setPromo(null);
+          alert(`Promo code removed: ${r.message}`);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [promoCodeApplied, subtotal, discount]);
 
   // Modals
   const [showOrderReview, setShowOrderReview] = useState(false);
@@ -137,7 +159,8 @@ export function NewSaleFlow({ staffId, staffName }: { staffId: string; staffName
         paymentData.deliveryAddress,
         paymentData.deliveryPhone,
         paymentData.customerName,
-        paymentData.customerPhone
+        paymentData.customerPhone,
+        promo?.code
       );
 
       setLastInvoice({
@@ -148,7 +171,7 @@ export function NewSaleFlow({ staffId, staffName }: { staffId: string; staffName
           : null,
         items: cart,
         subtotal,
-        discount,
+        discount: discount + promoDiscount,
         tax,
         total,
         staffName,
@@ -159,6 +182,7 @@ export function NewSaleFlow({ staffId, staffName }: { staffId: string; staffName
       setShowInvoice(true);
 
       setCart([]);
+      setPromo(null);
       setDiscount(0);
       setTax(0);
       setStep("search");
@@ -386,6 +410,14 @@ export function NewSaleFlow({ staffId, staffName }: { staffId: string; staffName
             tax={tax}
             subtotal={subtotal}
             total={total}
+            promo={promo}
+            onApplyPromo={async (code) => {
+              const r = await checkPromoCode(code, subtotal - discount);
+              if (!r.ok) return r.message;
+              setPromo({ code: r.code, discount: r.discount });
+              return null;
+            }}
+            onRemovePromo={() => setPromo(null)}
             onUpdateDiscount={setDiscount}
             onUpdateTax={setTax}
             onUpdateQuantity={(variantId, newQty) => {

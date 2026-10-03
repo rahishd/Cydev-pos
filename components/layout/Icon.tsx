@@ -23,7 +23,8 @@ export type IconName =
   | "logout"
   | "back"
   | "close"
-  | "bell";
+  | "bell"
+  | "promo";
 
 const PATHS: Record<IconName, ReactNode> = {
   home: (
@@ -167,6 +168,14 @@ const PATHS: Record<IconName, ReactNode> = {
   ),
   back: <path d="M15 18l-6-6 6-6" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
+  promo: (
+    <>
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <path d="M9 15l6-6" />
+      <circle cx="9.5" cy="9.5" r="0.9" />
+      <circle cx="14.5" cy="14.5" r="0.9" />
+    </>
+  ),
   bell: (
     <>
       <path d="M6 9a6 6 0 0112 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z" />

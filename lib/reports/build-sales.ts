@@ -343,10 +343,20 @@ export async function paymentsReport(f: Filters, _ctx: Ctx): Promise<Body> {
 }
 
 export async function discountsReport(f: Filters, _ctx: Ctx): Promise<Body> {
-  const { lines } = await loadSales(f);
+  const { lines, sales } = await loadSales(f);
   const t = totalsOf(lines);
   const lineDisc = sumBy(lines, (l) => l.lineDisc);
   const orderDisc = sumBy(lines, (l) => l.orderDisc);
+  const promoSales = sales.filter((x) => x.promoCode && x.promoDiscount > 0.005);
+  const promoTotal = sumBy(promoSales, (x) => x.promoDiscount);
+  const byPromo = new Map<string, { n: number; amount: number }>();
+  for (const x of promoSales) {
+    const e = byPromo.get(x.promoCode as string) ?? { n: 0, amount: 0 };
+    e.n++;
+    e.amount += x.promoDiscount;
+    byPromo.set(x.promoCode as string, e);
+  }
+  const promoRows = [...byPromo.entries()].sort((a, b) => b[1].amount - a[1].amount).map(([code, e]) => ({ code, n: e.n, amount: round2(e.amount) })) as Row[];
   const bySale = groupLines(lines, (l) => l.saleId, (l) => l.invoiceNo).filter((g) => g.t.discounts > 0.005);
   const discounted = bySale.length;
 
@@ -375,9 +385,11 @@ export async function discountsReport(f: Filters, _ctx: Ctx): Promise<Body> {
       { label: "Discount as % of Sales", value: pct(t.discounts, t.gross), fmt: "pct" },
       { label: "Item-level Discounts", value: round2(lineDisc), fmt: "money" },
       { label: "Whole-bill Discounts", value: round2(orderDisc), fmt: "money" },
+      { label: "Promo-code Discounts", value: round2(promoTotal), fmt: "money", hint: `${promoSales.length} sale${promoSales.length === 1 ? "" : "s"}` },
     ],
-    notes: ["Manual and promotional discounts aren't recorded separately, so they are shown as item-level and whole-bill discounts."],
+    notes: ["Promo-code discounts are part of the whole-bill discounts. Sales made before promo codes existed show up as item-level or whole-bill discounts only."],
     tables: [
+      ...(promoRows.length ? [{ title: "By promo code", cols: [text("code", "Promo Code"), int("n", "Times Used"), money("amount", "Discount Given")], rows: promoRows, totals: totalsRow("Total", promoRows, ["n", "amount"], "code") }] : []),
       { title: "By staff", cols: [text("staff", "Staff"), int("sales", "Sales"), int("discounted", "Discounted Sales"), money("disc", "Discount Given"), pctCol("share", "% of Sales")], rows: staff, totals: totalsRow("Total", staff, ["sales", "discounted", "disc"], "staff") },
       { title: "By product (top 25)", cols: [text("product", "Product"), int("qty", "Qty"), money("disc", "Discount"), pctCol("share", "% of Sales")], rows: product },
       { title: "By invoice (top 50)", cols: [text("invoice", "Invoice"), { key: "date", label: "Date", fmt: "date" }, text("staff", "Staff"), text("customer", "Customer"), money("gross", "Gross"), money("disc", "Discount"), pctCol("share", "%")], rows: invoice },

@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { formatCurrency } from "@/lib/date-utils";
+import { useState } from "react";
+import { useCan, useSettings } from "@/components/providers/SettingsProvider";
 
 type CartItem = {
   variantId: string;
@@ -23,6 +25,9 @@ export function OrderReview({
   tax,
   subtotal,
   total,
+  promo,
+  onApplyPromo,
+  onRemovePromo,
   onUpdateDiscount,
   onUpdateTax,
   onUpdateQuantity,
@@ -35,6 +40,10 @@ export function OrderReview({
   tax: number;
   subtotal: number;
   total: number;
+  promo: { code: string; discount: number } | null;
+  /** Returns an error message, or null when the code was applied. */
+  onApplyPromo: (code: string) => Promise<string | null>;
+  onRemovePromo: () => void;
   onUpdateDiscount: (value: number) => void;
   onUpdateTax: (value: number) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
@@ -42,6 +51,22 @@ export function OrderReview({
   onBack: () => void;
   onProceedToPayment: () => void;
 }) {
+  const can = useCan();
+  const canPromo = can("sales.promo") && Boolean(useSettings().sales.allowDiscounts);
+  const [code, setCode] = useState("");
+  const [promoError, setPromoError] = useState("");
+  const [checking, setChecking] = useState(false);
+
+  const applyPromo = async () => {
+    if (!code.trim()) return;
+    setChecking(true);
+    setPromoError("");
+    const err = await onApplyPromo(code);
+    if (err) setPromoError(err);
+    else setCode("");
+    setChecking(false);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-2xl max-h-[90vh] max-h-[90dvh] overflow-y-auto p-6 space-y-4">
@@ -148,6 +173,47 @@ export function OrderReview({
                 className="w-32 text-right text-sm"
               />
             </div>
+
+            {/* Promo code */}
+            {canPromo && (
+              <div className="space-y-1">
+                {promo ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-text-muted">
+                      Promo <span className="font-mono font-semibold text-success">{promo.code}</span>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="font-medium text-success">- NPR {formatCurrency(promo.discount)}</span>
+                      <button type="button" onClick={onRemovePromo} className="text-xs text-danger underline">
+                        Remove
+                      </button>
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-text-muted">Promo code</span>
+                    <span className="flex items-center gap-2">
+                      <Input
+                        value={code}
+                        onChange={(e) => setCode(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            applyPromo();
+                          }
+                        }}
+                        placeholder="Enter code"
+                        className="w-32 font-mono text-sm"
+                      />
+                      <Button type="button" variant="secondary" onClick={applyPromo} disabled={checking || !code.trim()}>
+                        {checking ? "..." : "Apply"}
+                      </Button>
+                    </span>
+                  </div>
+                )}
+                {promoError && <p className="text-right text-xs text-danger">{promoError}</p>}
+              </div>
+            )}
 
             {/* Tax */}
             <div className="flex justify-between items-center gap-2">

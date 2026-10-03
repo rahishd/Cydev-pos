@@ -51,6 +51,16 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "sales.history", label: "View Sales History" },
       { key: "sales.online_payment", label: "Collect Online (QR) Payments" },
       { key: "sales.share", label: "Share / Download Invoice PDF" },
+      { key: "sales.promo", label: "Apply Promo Codes at Checkout" },
+    ],
+  },
+  {
+    key: "promos",
+    label: "Promo Codes",
+    viewKey: "promos.view",
+    items: [
+      { key: "promos.view", label: "View Promo Codes" },
+      { key: "promos.manage", label: "Create / Edit / Switch Off Promo Codes" },
     ],
   },
   {

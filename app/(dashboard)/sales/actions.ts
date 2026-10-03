@@ -9,6 +9,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { invoiceToken } from "@/lib/invoice-link";
 import { Decimal } from "@prisma/client/runtime/library";
+import { evaluatePromo, normalizeCode, toPromoLike } from "@/lib/promo";
 
 export async function getProductsForPOS(search?: string, categoryId?: string, brandId?: string) {
   await assertPermission("sales.create");
@@ -164,7 +165,8 @@ export async function createSale(
   deliveryAddress?: string,
   deliveryPhone?: string,
   customerName?: string,
-  customerPhone?: string
+  customerPhone?: string,
+  promoCode?: string
 ) {
   const access = await assertPermission("sales.create");
   if ((discount > 0 || items.some((i) => i.discount > 0)) && !access.can("sales.discount")) {
@@ -210,6 +212,19 @@ export async function createSale(
         );
       }
     }
+  }
+
+  // A promo code takes its discount off the bill. It is checked again here, so the browser can't invent one.
+  let promoApplied: { id: string; code: string; discount: number } | null = null;
+  if (promoCode?.trim()) {
+    if (!access.can("sales.promo")) throw new Error("You don't have permission to apply promo codes.");
+    if (!settings.sales.allowDiscounts) throw new Error("Discounts are turned off in Settings.");
+    const found = await prisma.promoCode.findUnique({ where: { code: normalizeCode(promoCode) } });
+    const billAmount = items.reduce((sum, i) => sum + Number(i.unitPrice) * i.quantity - (i.discount || 0), 0) - discount;
+    const check = evaluatePromo(found ? toPromoLike(found) : null, billAmount);
+    if (!check.ok || !found) throw new Error(check.ok ? "That promo code isn't valid." : check.message);
+    promoApplied = { id: found.id, code: found.code, discount: check.discount };
+    discount += check.discount;
   }
 
   if (!settings.inventory.allowNegativeStock) {
@@ -293,6 +308,8 @@ export async function createSale(
       staffId,
       subtotal: new Decimal(subtotal),
       discount: new Decimal(discount),
+      promoCode: promoApplied?.code ?? null,
+      promoDiscount: new Decimal(promoApplied?.discount ?? 0),
       tax: new Decimal(tax),
       total: new Decimal(total),
       amountPaid: new Decimal(amountPaid),
@@ -313,6 +330,10 @@ export async function createSale(
     },
     select: { id: true, invoiceNo: true },
   });
+
+  if (promoApplied) {
+    await prisma.promoCode.update({ where: { id: promoApplied.id }, data: { usedCount: { increment: 1 } } });
+  }
 
   // Create invoice
   await prisma.invoice.create({
@@ -402,6 +423,7 @@ export async function createSale(
       `Invoice ${newInvoiceNo}: ${npr(total)} paid by ${[...new Set(usedMethods)].map((m) => m.replace(/_/g, " ")).join(" + ")}, ` +
       `${customerId ? "registered customer" : "walk-in"}` +
       (totalDiscount > 0 ? `, discount ${npr(totalDiscount)}` : "") +
+      (promoApplied ? `, promo ${promoApplied.code} -${npr(promoApplied.discount)}` : "") +
       (total - amountPaid > 0.001 ? `, due ${npr(total - amountPaid)}` : "") +
       `. Items: ${itemSummary}${items.length > 4 ? ", ..." : ""}`,
     next: {
@@ -844,4 +866,13 @@ export async function getInvoiceShareUrl(saleId: string) {
   const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? `${proto}://${host}`;
 
   return `${origin}/api/invoice/${saleId}?t=${invoiceToken(saleId)}`;
+}
+
+/** Checks a promo code against the current bill so the checkout can show the discount before the sale is saved. */
+export async function checkPromoCode(code: string, billAmount: number) {
+  await assertPermission("sales.promo");
+  if (!(await getSettings()).sales.allowDiscounts) return { ok: false as const, message: "Discounts are turned off in Settings." };
+  const found = await prisma.promoCode.findUnique({ where: { code: normalizeCode(code) } });
+  const check = evaluatePromo(found ? toPromoLike(found) : null, billAmount);
+  return check.ok ? { ok: true as const, code: found!.code, discount: check.discount, label: check.label } : check;
 }

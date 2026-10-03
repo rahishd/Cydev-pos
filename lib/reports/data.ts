@@ -48,6 +48,8 @@ export type SaleRow = {
   staffName: string;
   customerName: string;
   discount: number;
+  promoCode: string | null;
+  promoDiscount: number;
   tax: number;
   total: number;
   payments: Array<{ method: string; amount: number }>;
@@ -75,6 +77,8 @@ export async function loadSales(f: Filters): Promise<Loaded> {
       invoiceNo: true,
       createdAt: true,
       discount: true,
+      promoCode: true,
+      promoDiscount: true,
       tax: true,
       total: true,
       staffId: true,
@@ -161,6 +165,8 @@ export async function loadSales(f: Filters): Promise<Loaded> {
         staffName: s.staff.name,
         customerName: s.customer?.name ?? "Walk-in",
         discount: orderDisc,
+        promoCode: s.promoCode,
+        promoDiscount: num(s.promoDiscount),
         tax: num(s.tax),
         total: num(s.total),
         payments: s.payments.map((p) => ({ method: p.method, amount: num(p.amount) })),

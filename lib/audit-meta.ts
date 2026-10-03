@@ -8,6 +8,7 @@ export const AUDIT_MODULES = [
   "Customers",
   "Suppliers",
   "Expenses",
+  "Promo Codes",
   "Settings",
   "Backup",
 ] as const;
@@ -78,6 +79,8 @@ export function moduleFromType(type: string): string {
       return "Customers";
     case "Supplier":
       return "Suppliers";
+    case "PromoCode":
+      return "Promo Codes";
     case "Backup":
       return "Backup";
     default:
