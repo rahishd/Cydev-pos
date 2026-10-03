@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/layout/Icon";
 import { NepaliCalendar } from "@/components/layout/NepaliCalendar";
+import { Weather } from "@/components/layout/Weather";
 import { HOME_GROUPS, canSee, pageTitle } from "@/components/layout/nav-config";
 import { logoutAction } from "@/lib/session-actions";
 import { useSettings } from "@/components/providers/SettingsProvider";
@@ -36,10 +37,15 @@ export function MobileHeader({ userName, userRole }: Pick<Props, "userName" | "u
           </div>
           <div className="min-w-0 flex-1 leading-tight">
             <div className="truncate text-lg font-semibold">Hi, {first}</div>
-            <div className="text-xs text-white/80">{userRole === "OWNER" ? "Owner" : "Staff"}</div>
+            <div className="text-xs text-white/80">
+              {userRole === "OWNER" ? "Owner" : "Staff"}
+            </div>
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logo} alt={String(business.shopName)} className="absolute right-4 top-4 h-[60px] w-[60px] rounded-xl bg-[#ffffff] object-contain p-1" />
+          <div className="absolute right-4 top-4 flex w-[60px] flex-col items-center gap-1.5">
+            <img src={logo} alt={String(business.shopName)} className="h-[60px] w-[60px] rounded-xl bg-[#ffffff] object-contain p-1" />
+            <Weather className="whitespace-nowrap rounded-full bg-white/20 px-2 py-0.5 text-xs font-medium text-white" />
+          </div>
         </div>
         <div className="mt-2 -ml-2">
           <NepaliCalendar onColor />
