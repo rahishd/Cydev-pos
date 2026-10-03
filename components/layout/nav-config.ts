@@ -18,7 +18,6 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: "dashboard", enabled: true, anyOf: ["dashboard.view"] },
   { id: "products", label: "Products", href: "/products", icon: "products", enabled: true, anyOf: ["products.view"] },
   { id: "inventory", label: "Inventory", href: "/inventory", icon: "inventory", enabled: true, anyOf: ["inventory.view"] },
-  { id: "purchases", label: "Purchases", href: "/purchases", icon: "purchases", enabled: true, anyOf: ["purchases.view"] },
   {
     id: "sales",
     label: "Sales / POS",
@@ -68,7 +67,7 @@ export const HOME_GROUPS: TileGroup[] = [
       byId("customers"),
     ],
   },
-  { title: "Stock & Purchases", tiles: [byId("products"), byId("inventory"), byId("purchases")] },
+  { title: "Stock", tiles: [byId("products"), byId("inventory")] },
   { title: "Money", tiles: [byId("expenses"), byId("reports")] },
   { title: "Administration", tiles: [byId("users"), byId("audit"), byId("notifications"), byId("settings")] },
 ];

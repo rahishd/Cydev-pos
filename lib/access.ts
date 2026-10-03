@@ -105,7 +105,6 @@ const HOME_ORDER: [string[], string][] = [
   [["products.view"], "/products"],
   [["inventory.view"], "/inventory"],
   [["customers.view"], "/customers"],
-  [["purchases.view"], "/purchases"],
   [["expenses.view"], "/expenses"],
 ];
 
