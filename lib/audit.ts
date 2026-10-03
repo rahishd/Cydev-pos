@@ -1,5 +1,7 @@
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { notifyOwnersOfEvent } from "@/lib/push";
 
 export type AuditActor = {
   id?: string | null;
@@ -92,6 +94,23 @@ export async function logAudit(e: AuditEvent): Promise<void> {
     });
   } catch (err) {
     console.error("Audit log write failed:", err);
+    return;
+  }
+
+  // Tell the Owner's phones, after the response is sent so the cashier never waits for it.
+  const notify = () =>
+    notifyOwnersOfEvent({
+      action: e.action,
+      module: e.module,
+      title: e.title,
+      description: e.description,
+      actor: e.actor,
+      status: e.status,
+    }).catch((err) => console.error("Push notification failed:", err));
+  try {
+    after(notify);
+  } catch {
+    void notify();
   }
 }
 

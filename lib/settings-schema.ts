@@ -40,7 +40,7 @@ export type SettingsSection = {
   description: string;
   /** Staff need this permission (or any settings.* the Owner grants for that area); the Owner always has access. */
   permission: string;
-  custom?: "logo" | "expenseCategories" | "backup";
+  custom?: "logo" | "expenseCategories" | "backup" | "push";
   fields: SettingField[];
 };
 
@@ -314,9 +314,15 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: "notifications",
     label: "Notifications",
-    description: "Choose which alerts you want. Delivery by SMS, WhatsApp or email isn't connected yet, so these are saved for later.",
+    description: "Phone alerts go to the Owner's phone even when it is locked. Turn them on for each phone below. SMS, WhatsApp and email delivery aren't connected yet, so the alert switches further down are saved for later.",
     permission: "settings.system",
+    custom: "push",
     fields: [
+      { key: "pushSales", label: "Phone alert: every new sale", type: "toggle", default: true, applied: true },
+      { key: "pushPayments", label: "Phone alert: payments received", type: "toggle", default: true, applied: true },
+      { key: "pushReturns", label: "Phone alert: returns and exchanges", type: "toggle", default: true, applied: true },
+      { key: "pushStock", label: "Phone alert: stock and product changes", type: "toggle", default: true, applied: true, help: "Stock added or adjusted, damaged or lost stock, price changes, products added or removed." },
+      { key: "pushSecurity", label: "Phone alert: failed sign-ins and locked accounts", type: "toggle", default: false, applied: true },
       { key: "lowStock", label: "Low-stock notification", type: "toggle", default: true },
       { key: "outOfStock", label: "Out-of-stock notification", type: "toggle", default: true },
       { key: "customerCreditDue", label: "Customer credit due", type: "toggle", default: true },

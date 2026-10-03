@@ -15,6 +15,7 @@ import {
   type SettingsSection,
 } from "@/lib/settings-schema";
 import { BackupPanel, ExpenseCategoriesPanel, LogoPanel } from "./SettingsPanels";
+import { PushPanel } from "./PushPanel";
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -216,6 +217,7 @@ export function SettingsClient({ data }: { data: SettingsPageData }) {
           <p className="mb-4 text-sm text-text-muted">{section.description}</p>
 
           <div className="space-y-4">
+            {section.custom === "push" && data.isOwner && <PushPanel />}
             {section.custom === "logo" && <LogoPanel key={String(data.settings.business.logo ?? "")} logo={data.settings.business.logo} />}
             <SectionForm
               key={section.id + JSON.stringify(data.settings[section.id])}
