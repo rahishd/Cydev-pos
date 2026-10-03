@@ -14,6 +14,7 @@ const MOVEMENT_LABELS: Record<string, string> = {
   SUPPLIER_RETURN: "Supplier Return",
   DAMAGE: "Damage",
   LOSS: "Loss",
+  ADJUSTMENT: "Manual Adjustment",
   MANUAL_ADJUSTMENT: "Manual Adjustment",
 };
 
@@ -69,10 +70,10 @@ export function StockMovementsTab() {
                 <span className="text-xs font-medium">{MOVEMENT_LABELS[m.type] || m.type}</span>
               </td>
               <td className={`py-2 text-right font-semibold ${getMovementColor(m.type)}`}>
-                {m.quantity > 0 ? "+" : ""}{m.quantity}
+                {m.quantityChange > 0 ? "+" : ""}{m.quantityChange}
               </td>
-              <td className="py-2 text-text-muted text-xs">{m.user.name}</td>
-              <td className="py-2 text-text-muted text-xs">{m.notes || "—"}</td>
+              <td className="py-2 text-text-muted text-xs">{m.createdBy.name}</td>
+              <td className="py-2 text-text-muted text-xs">{m.reason || "—"}</td>
             </tr>
           ))}
         </tbody>

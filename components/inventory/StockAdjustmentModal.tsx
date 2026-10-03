@@ -7,12 +7,13 @@ import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { useState } from "react";
 import { createStockMovement } from "@/app/(dashboard)/inventory/actions";
+import { useSettings } from "@/components/providers/SettingsProvider";
 
+/** Adding stock is always a manual adjustment; the other reasons only take stock away. */
 const MOVEMENT_TYPES = [
-  { value: "MANUAL_ADJUSTMENT", label: "Manual Adjustment" },
+  { value: "ADJUSTMENT", label: "Manual Adjustment" },
   { value: "DAMAGE", label: "Damage" },
   { value: "LOSS", label: "Loss" },
-  { value: "CUSTOMER_RETURN", label: "Customer Return" },
   { value: "SUPPLIER_RETURN", label: "Supplier Return" },
 ];
 
@@ -33,8 +34,9 @@ export function StockAdjustmentModal({
   onSuccess: () => void;
   userId?: string;
 }) {
+  const needsReason = Boolean(useSettings().inventory.requireAdjustmentReason);
   const [quantity, setQuantity] = useState("");
-  const [type, setType] = useState("MANUAL_ADJUSTMENT");
+  const [type, setType] = useState("ADJUSTMENT");
   const [notes, setNotes] = useState("");
   const [isAdjustment, setIsAdjustment] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -43,6 +45,10 @@ export function StockAdjustmentModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!variantId || !userId) return;
+    if (needsReason && !notes.trim()) {
+      setError("Please type a reason in the notes box (your Settings require one for every stock adjustment).");
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -92,7 +98,10 @@ export function StockAdjustmentModal({
             </button>
             <button
               type="button"
-              onClick={() => setIsAdjustment(false)}
+              onClick={() => {
+                setIsAdjustment(false);
+                setType("ADJUSTMENT");
+              }}
               className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                 !isAdjustment
                   ? "bg-accent text-white"
@@ -121,7 +130,7 @@ export function StockAdjustmentModal({
         <div>
           <label className="block text-sm font-medium text-text mb-2">Reason</label>
           <Select value={type} onChange={(e) => setType(e.target.value)}>
-            {MOVEMENT_TYPES.map((t) => (
+            {MOVEMENT_TYPES.filter((t) => isAdjustment || t.value === "ADJUSTMENT").map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
               </option>
@@ -131,11 +140,11 @@ export function StockAdjustmentModal({
 
         {/* Notes */}
         <div>
-          <label className="block text-sm font-medium text-text mb-2">Notes (Optional)</label>
+          <label className="block text-sm font-medium text-text mb-2">{needsReason ? "Notes (required)" : "Notes (Optional)"}</label>
           <Textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Add any additional notes..."
+            placeholder={needsReason ? "Why is the stock being changed?" : "Add any additional notes..."}
             rows={3}
           />
         </div>

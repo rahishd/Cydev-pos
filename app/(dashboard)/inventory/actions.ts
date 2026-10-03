@@ -159,7 +159,7 @@ export async function getVariantDetails(variantId: string) {
     if (m.type === "SUPPLIER_RETURN") stockSummary.supplierReturns += Math.abs(m.quantityChange);
     if (m.type === "DAMAGE") stockSummary.damaged += Math.abs(m.quantityChange);
     if (m.type === "LOSS") stockSummary.loss += Math.abs(m.quantityChange);
-    if (m.type === "MANUAL_ADJUSTMENT") stockSummary.manualAdjustment += m.quantityChange;
+    if (m.type === "ADJUSTMENT") stockSummary.manualAdjustment += m.quantityChange;
   });
 
   const inventoryValue = variant.quantity * Number(variant.purchasePrice);
@@ -215,6 +215,14 @@ export async function createStockMovement(
   reason: string,
   _clientUserId?: string
 ) {
+  // Older open pages still send the previous name for a manual adjustment.
+  if (type === "MANUAL_ADJUSTMENT") type = "ADJUSTMENT";
+  const TYPES = ["OPENING_STOCK", "PURCHASE", "SALE", "CUSTOMER_RETURN", "SUPPLIER_RETURN", "DAMAGE", "LOSS", "ADJUSTMENT"] as const;
+  if (!(TYPES as readonly string[]).includes(type)) throw new Error("That stock change type isn't recognised.");
+  const movementType = type as (typeof TYPES)[number];
+  if (["DAMAGE", "LOSS", "SUPPLIER_RETURN"].includes(movementType) && quantity > 0) {
+    throw new Error("Damage, loss and supplier returns can only take stock away. To add stock, use Manual Adjustment.");
+  }
   const adjusting =
     quantity < 0 || ["ADJUSTMENT", "DAMAGE", "LOSS", "MANUAL_ADJUSTMENT", "SUPPLIER_RETURN"].includes(type);
   const access = await assertPermission(adjusting ? "inventory.adjust" : "inventory.add_stock");
@@ -240,7 +248,7 @@ export async function createStockMovement(
   const movement = await prisma.stockMovement.create({
     data: {
       productVariantId: variantId,
-      type,
+      type: movementType,
       quantityChange: quantity,
       reason,
       createdById: userId,
