@@ -30,7 +30,7 @@ export function MobileHeader({ userName, userRole }: Pick<Props, "userName" | "u
 
   if (isHome) {
     return (
-      <header className={cn("relative px-4 pb-14 pt-4 text-white lg:hidden", HEADER_BG, "rounded-b-[2rem]")}>
+      <header className={cn("relative px-4 pb-4 pt-4 text-white lg:hidden", HEADER_BG, "rounded-b-[2rem]")}>
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-lg font-bold text-orange-600">
             {first.charAt(0).toUpperCase()}

@@ -79,7 +79,7 @@ export function HomeHub({
 
   return (
     <div className="-mx-3 -mt-3 min-h-[calc(100vh-4rem)] bg-bg pb-8 lg:hidden">
-      <div className="-mt-10 space-y-3 px-3">
+      <div className="mt-3 space-y-3 px-3">
         <section className="rounded-2xl bg-white shadow-sm">
           {summary && (
             <div className="flex items-center rounded-t-2xl bg-zinc-50 px-4 py-3">
