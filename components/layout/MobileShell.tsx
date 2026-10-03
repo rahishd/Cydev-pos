@@ -8,6 +8,7 @@ import { Icon } from "@/components/layout/Icon";
 import { NepaliCalendar } from "@/components/layout/NepaliCalendar";
 import { HOME_GROUPS, canSee, pageTitle } from "@/components/layout/nav-config";
 import { logoutAction } from "@/lib/session-actions";
+import { useSettings } from "@/components/providers/SettingsProvider";
 
 type Props = {
   isOwner: boolean;
@@ -22,19 +23,23 @@ const HEADER_BG = "bg-gradient-to-br from-orange-500 to-orange-600";
 export function MobileHeader({ userName, userRole }: Pick<Props, "userName" | "userRole">) {
   const pathname = usePathname();
   const isHome = pathname === "/home";
+  const { business } = useSettings();
+  const logo = String(business.logo ?? "/logo.png");
   const first = userName.trim().split(/\s+/)[0] || "there";
 
   if (isHome) {
     return (
-      <header className={cn("px-4 pb-14 pt-4 text-white lg:hidden", HEADER_BG, "rounded-b-[2rem]")}>
+      <header className={cn("relative px-4 pb-14 pt-4 text-white lg:hidden", HEADER_BG, "rounded-b-[2rem]")}>
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-lg font-bold text-orange-600">
             {first.charAt(0).toUpperCase()}
           </div>
-          <div className="min-w-0 leading-tight">
+          <div className="min-w-0 flex-1 leading-tight">
             <div className="truncate text-lg font-semibold">Hi, {first}</div>
             <div className="text-xs text-white/80">{userRole === "OWNER" ? "Owner" : "Staff"}</div>
           </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logo} alt={String(business.shopName)} className="absolute right-4 top-4 h-[60px] w-[60px] rounded-xl bg-[#ffffff] object-contain p-1" />
         </div>
         <div className="mt-2 -ml-2">
           <NepaliCalendar onColor />
