@@ -279,62 +279,6 @@ export async function loadExpenses(f: Filters) {
   }));
 }
 
-export async function loadPurchases(f: Filters) {
-  const { start, end } = toInstants(f.from, f.to);
-  const rows = await prisma.purchase.findMany({
-    where: {
-      date: { gte: start, lt: end },
-      status: { notIn: ["DRAFT", "CANCELLED"] },
-      ...(f.supplierId ? { supplierId: f.supplierId } : {}),
-    },
-    orderBy: { date: "desc" },
-    select: {
-      id: true,
-      purchaseNo: true,
-      date: true,
-      status: true,
-      total: true,
-      paidAmount: true,
-      supplier: { select: { id: true, name: true } },
-      createdBy: { select: { name: true } },
-      items: {
-        select: {
-          quantityOrdered: true,
-          quantityReceived: true,
-          purchasePrice: true,
-          productVariant: {
-            select: {
-              sku: true,
-              size: true,
-              color: true,
-              product: { select: { name: true, category: { select: { id: true } }, brand: { select: { id: true } } } },
-            },
-          },
-        },
-      },
-    },
-  });
-  return rows.map((p) => ({
-    id: p.id,
-    no: p.purchaseNo,
-    at: p.date,
-    status: p.status as string,
-    total: num(p.total),
-    paid: num(p.paidAmount),
-    supplierId: p.supplier.id,
-    supplier: p.supplier.name,
-    by: p.createdBy.name,
-    items: p.items.map((i) => ({
-      qty: i.quantityReceived > 0 ? i.quantityReceived : i.quantityOrdered,
-      price: num(i.purchasePrice),
-      sku: i.productVariant.sku,
-      name: variantName(i.productVariant.product.name, i.productVariant.size, i.productVariant.color),
-      categoryId: i.productVariant.product.category?.id ?? null,
-      brandId: i.productVariant.product.brand?.id ?? null,
-    })),
-  }));
-}
-
 export const sumBy = <T,>(rows: T[], f: (r: T) => number) => rows.reduce((a, r) => a + f(r), 0);
 
 export function totalsRow(label: string, rows: Row[], keys: string[], labelKey: string): Row {

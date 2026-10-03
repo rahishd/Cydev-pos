@@ -54,18 +54,6 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
   {
-    key: "purchases",
-    label: "Purchases",
-    viewKey: "purchases.view",
-    items: [
-      { key: "purchases.view", label: "View Purchases" },
-      { key: "purchases.create", label: "Create Purchase" },
-      { key: "purchases.receive", label: "Receive Stock" },
-      { key: "purchases.edit", label: "Edit Purchase" },
-      { key: "purchases.cancel", label: "Cancel Purchase" },
-    ],
-  },
-  {
     key: "suppliers",
     label: "Suppliers",
     viewKey: "suppliers.view",
@@ -106,7 +94,6 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     items: [
       { key: "reports.sales", label: "Sales Reports" },
       { key: "reports.inventory", label: "Inventory Reports" },
-      { key: "reports.purchase", label: "Purchase Reports" },
       { key: "reports.expense", label: "Expense Reports" },
       { key: "reports.gross_profit", label: "Gross Profit Reports" },
       { key: "reports.net_profit", label: "Net Profit Reports" },

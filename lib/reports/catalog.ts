@@ -15,7 +15,6 @@ export type ReportDef = {
 const SALES = ["reports.sales"];
 const PROFIT = ["reports.gross_profit", "reports.net_profit"];
 const INV = ["reports.inventory"];
-const PUR = ["reports.purchase"];
 
 export const REPORTS: ReportDef[] = [
   { key: "overview", label: "Overview", group: "Overview", needs: [], filters: [] },
@@ -42,10 +41,6 @@ export const REPORTS: ReportDef[] = [
   { key: "products.fast", label: "Fast Moving", group: "Products", needs: INV, filters: ["category", "brand"] },
   { key: "products.slow", label: "Slow Moving", group: "Products", needs: INV, filters: ["category", "brand"] },
 
-  { key: "purchases.summary", label: "Purchase Summary", group: "Purchases", needs: PUR, filters: ["supplier"] },
-  { key: "purchases.product", label: "Purchase by Product", group: "Purchases", needs: PUR, filters: ["category", "brand", "supplier"] },
-  { key: "purchases.supplier", label: "Purchase by Supplier", group: "Purchases", needs: PUR, filters: ["supplier"] },
-  { key: "suppliers.statement", label: "Supplier Statement", group: "Suppliers", needs: PUR, filters: ["supplier"] },
 
   { key: "customers.summary", label: "Customer Summary", group: "Customers", needs: ["reports.customers"], filters: [] },
   { key: "customers.top", label: "Top Customers", group: "Customers", needs: ["reports.customers"], filters: [] },

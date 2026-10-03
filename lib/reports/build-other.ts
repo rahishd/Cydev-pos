@@ -3,7 +3,6 @@ import {
   DIGITAL,
   groupLines,
   loadExpenses,
-  loadPurchases,
   loadReturns,
   loadSales,
   methodLabel,
@@ -271,87 +270,6 @@ export async function productsSlow(f: Filters, _c: Ctx): Promise<Body> {
   };
 }
 
-// ---------------------------------------------------------------- purchases and suppliers
-
-export async function purchasesSummary(f: Filters, _c: Ctx): Promise<Body> {
-  const list = await loadPurchases(f);
-  const rows: Row[] = list.map((p) => ({ date: p.at.toISOString(), no: p.no, supplier: p.supplier, status: p.status.replace(/_/g, " ").toLowerCase(), total: round2(p.total), paid: round2(p.paid), due: round2(Math.max(0, p.total - p.paid)), by: p.by }));
-  return {
-    cards: [
-      { label: "Total Purchases", value: round2(sumBy(list, (p) => p.total)), fmt: "money" },
-      { label: "Purchase Orders", value: list.length, fmt: "int" },
-      { label: "Paid to Suppliers", value: round2(sumBy(list, (p) => p.paid)), fmt: "money" },
-      { label: "Outstanding to Suppliers", value: round2(sumBy(list, (p) => Math.max(0, p.total - p.paid))), fmt: "money", tone: "bad" },
-    ],
-    notes: ["Draft and cancelled purchases are left out."],
-    tables: [{ cols: [date("date", "Date"), text("no", "Purchase No"), text("supplier", "Supplier"), text("status", "Status"), money("total", "Total"), money("paid", "Paid"), money("due", "Due"), text("by", "Created By")], rows, totals: totalsRow("Total", rows, ["total", "paid", "due"], "no") }],
-  };
-}
-
-export async function purchasesByProduct(f: Filters, _c: Ctx): Promise<Body> {
-  const list = await loadPurchases(f);
-  const m = new Map<string, { name: string; sku: string; qty: number; cost: number; suppliers: Set<string> }>();
-  for (const p of list) {
-    for (const i of p.items) {
-      if (f.categoryId && i.categoryId !== f.categoryId) continue;
-      if (f.brandId && i.brandId !== f.brandId) continue;
-      const e = m.get(i.sku) ?? { name: i.name, sku: i.sku, qty: 0, cost: 0, suppliers: new Set<string>() };
-      e.qty += i.qty;
-      e.cost += i.qty * i.price;
-      e.suppliers.add(p.supplier);
-      m.set(i.sku, e);
-    }
-  }
-  const rows: Row[] = [...m.values()].sort((a, b) => b.cost - a.cost).map((e) => ({ product: e.name, sku: e.sku, qty: e.qty, cost: round2(e.cost), avg: e.qty ? round2(e.cost / e.qty) : 0, supplier: [...e.suppliers].join(", ") }));
-  return { tables: [{ cols: [text("product", "Product"), text("sku", "SKU"), int("qty", "Quantity Purchased"), money("cost", "Purchase Cost"), money("avg", "Average Cost"), text("supplier", "Supplier")], rows, totals: totalsRow("Total", rows, ["qty", "cost"], "product") }] };
-}
-
-async function supplierTable(f: Filters) {
-  const list = await loadPurchases(f);
-  const m = new Map<string, { name: string; n: number; total: number; paid: number; last: Date }>();
-  for (const p of list) {
-    const e = m.get(p.supplierId) ?? { name: p.supplier, n: 0, total: 0, paid: 0, last: p.at };
-    e.n++;
-    e.total += p.total;
-    e.paid += p.paid;
-    if (p.at > e.last) e.last = p.at;
-    m.set(p.supplierId, e);
-  }
-  return [...m.values()].sort((a, b) => b.total - a.total).map((e) => ({ supplier: e.name, n: e.n, total: round2(e.total), paid: round2(e.paid), due: round2(Math.max(0, e.total - e.paid)), last: e.last.toISOString() })) as Row[];
-}
-
-export async function purchasesBySupplier(f: Filters, _c: Ctx): Promise<Body> {
-  const rows = await supplierTable(f);
-  return {
-    notes: ["Supplier returns aren't recorded against purchases, so they are not shown here."],
-    charts: [{ kind: "hbar", title: "Purchases by supplier", money: true, data: rows.slice(0, 8).map((r) => ({ name: String(r.supplier), total: Number(r.total) })), series: [{ key: "total", label: "Purchases" }] }],
-    tables: [{ cols: [text("supplier", "Supplier"), int("n", "Purchases"), money("total", "Total Purchase"), money("paid", "Paid"), money("due", "Outstanding"), date("last", "Last Purchase")], rows, totals: totalsRow("Total", rows, ["n", "total", "paid", "due"], "supplier") }],
-  };
-}
-
-export async function suppliersStatement(f: Filters, _c: Ctx): Promise<Body> {
-  const rows = await supplierTable(f);
-  const { start } = toInstants(f.from, f.to);
-  const before = await prisma.purchase.findMany({
-    where: { date: { lt: start }, status: { notIn: ["DRAFT", "CANCELLED"] }, ...(f.supplierId ? { supplierId: f.supplierId } : {}) },
-    select: { supplier: { select: { name: true } }, total: true, paidAmount: true },
-  });
-  const opening = new Map<string, number>();
-  for (const p of before) opening.set(p.supplier.name, (opening.get(p.supplier.name) ?? 0) + Math.max(0, num(p.total) - num(p.paidAmount)));
-  const names = new Set([...rows.map((r) => String(r.supplier)), ...opening.keys()]);
-  const stmt: Row[] = [...names].map((name) => {
-    const r = rows.find((x) => x.supplier === name);
-    const open = round2(opening.get(name) ?? 0);
-    const purchases = Number(r?.total ?? 0);
-    const paid = Number(r?.paid ?? 0);
-    return { supplier: name, opening: open, purchases, paid, closing: round2(open + purchases - paid) };
-  });
-  return {
-    notes: ["Payments are recorded on each purchase, so \"Paid\" follows the purchase date rather than the day the money was handed over."],
-    tables: [{ cols: [text("supplier", "Supplier"), money("opening", "Opening Balance"), money("purchases", "Purchases"), money("paid", "Payments"), money("closing", "Closing Balance")], rows: stmt, totals: totalsRow("Total", stmt, ["opening", "purchases", "paid", "closing"], "supplier") }],
-  };
-}
-
 // ---------------------------------------------------------------- customers
 
 export async function customersSummary(f: Filters, _c: Ctx): Promise<Body> {
@@ -470,11 +388,10 @@ export async function expensesReport(f: Filters, _c: Ctx): Promise<Body> {
 
 export async function staffActivity(f: Filters, _c: Ctx): Promise<Body> {
   const { start, end } = toInstants(f.from, f.to);
-  const [users, { lines }, returns, purchases, moves, expenses] = await Promise.all([
+  const [users, { lines }, returns, moves, expenses] = await Promise.all([
     prisma.user.findMany({ where: f.staffId ? { id: f.staffId } : {}, select: { id: true, name: true, userId: true } }),
     loadSales({ ...f, staffId: undefined }),
     loadReturns({ ...f, staffId: undefined }),
-    loadPurchases({ ...f, supplierId: undefined }),
     prisma.stockMovement.findMany({ where: { createdAt: { gte: start, lt: end }, type: { in: [...ADJUST_TYPES] } }, select: { createdById: true } }),
     loadExpenses({ ...f, staffId: undefined }),
   ]);
@@ -487,14 +404,13 @@ export async function staffActivity(f: Filters, _c: Ctx): Promise<Body> {
       value: round2(t.net),
       disc: round2(t.discounts),
       returns: returns.filter((r) => r.type === "RETURN" && r.staff === u.name).length,
-      purchases: purchases.filter((p) => p.by === u.name).length,
       adjustments: moves.filter((m) => m.createdById === u.id).length,
       expenses: expenses.filter((e) => e.by === u.name).length,
     };
   });
   return {
     notes: ["This shows how much business each person handled. For exactly what a person did in the system, use the Audit Log."],
-    tables: [{ cols: [text("staff", "Staff"), int("sales", "Sales Completed"), money("value", "Sales Value"), money("disc", "Discounts Given"), int("returns", "Returns (their sales)"), int("purchases", "Purchases Created"), int("adjustments", "Stock Adjustments"), int("expenses", "Expenses Recorded")], rows, totals: totalsRow("Total", rows, ["sales", "value", "disc", "returns", "purchases", "adjustments", "expenses"], "staff") }],
+    tables: [{ cols: [text("staff", "Staff"), int("sales", "Sales Completed"), money("value", "Sales Value"), money("disc", "Discounts Given"), int("returns", "Returns (their sales)"), int("adjustments", "Stock Adjustments"), int("expenses", "Expenses Recorded")], rows, totals: totalsRow("Total", rows, ["sales", "value", "disc", "returns", "adjustments", "expenses"], "staff") }],
   };
 }
 
@@ -537,11 +453,10 @@ export async function dailyClosing(f: Filters, _c: Ctx): Promise<Body> {
 
 export async function overview(f: Filters, ctx: Ctx): Promise<Body> {
   const needSales = ctx.can("reports.sales") || ctx.can("reports.gross_profit") || ctx.can("reports.net_profit");
-  const [sold, returns, expenses, purchases, credits] = await Promise.all([
+  const [sold, returns, expenses, credits] = await Promise.all([
     needSales ? loadSales(f) : Promise.resolve(null),
     ctx.can("reports.sales") || needSales ? loadReturns(f) : Promise.resolve([]),
     ctx.can("reports.expense") || ctx.can("reports.net_profit") ? loadExpenses({ ...f, method: undefined, staffId: undefined }) : Promise.resolve([]),
-    ctx.can("reports.purchase") ? loadPurchases(f) : Promise.resolve([]),
     ctx.can("reports.customers") ? prisma.customerCredit.aggregate({ _sum: { amount: true, amountPaid: true } }) : Promise.resolve(null),
   ]);
 
@@ -586,7 +501,6 @@ export async function overview(f: Filters, ctx: Ctx): Promise<Body> {
       charts.push({ kind: "hbar", title: "Top products", money: true, data: top.map((g) => ({ name: g.label, net: round2(g.t.net) })), series: [{ key: "net", label: "Sales" }] });
     }
   }
-  if (ctx.can("reports.purchase")) cards.push({ label: "Total Purchases", value: round2(sumBy(purchases, (p) => p.total)), fmt: "money" });
   if (credits) cards.push({ label: "Outstanding Credit", value: round2(num(credits._sum.amount) - num(credits._sum.amountPaid)), fmt: "money", tone: "bad" });
 
   return { cards, charts, notes: ["You only see the figures your account has permission for."] };

@@ -19,7 +19,6 @@ const MODULE_NEEDS: Record<string, string[]> = {
   Products: ["products.view"],
   Inventory: ["inventory.view", "inventory.history"],
   Sales: ["sales.history", "sales.create"],
-  Purchases: ["purchases.view"],
   Customers: ["customers.view"],
   Suppliers: ["suppliers.view"],
   Expenses: ["expenses.view"],
