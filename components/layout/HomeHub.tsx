@@ -78,7 +78,7 @@ export function HomeHub({
   const mask = (v: string) => (hidden ? "XXXX.XX" : v);
 
   return (
-    <div className="-mx-3 -mt-3 min-h-[calc(100vh-4rem)] bg-[#f3f5f7] pb-8 lg:hidden">
+    <div className="-mx-3 -mt-3 min-h-[calc(100vh-4rem)] bg-bg pb-8 lg:hidden">
       <div className="-mt-10 space-y-3 px-3">
         <section className="rounded-2xl bg-white shadow-sm">
           {summary && (

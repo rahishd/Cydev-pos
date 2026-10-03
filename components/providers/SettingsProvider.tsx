@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect } from "react";
 import { applyBrand } from "@/lib/shop-info";
 import type { SettingsValues } from "@/lib/settings-schema";
 
@@ -20,6 +20,13 @@ export function SettingsProvider({
 }) {
   // PDFs are built in the browser, so they need the saved shop details too.
   applyBrand(settings);
+  const theme = settings.system.theme === "dark" ? "dark" : "light";
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem("theme", theme);
+    } catch {}
+  }, [theme]);
   return (
     <SettingsContext.Provider value={settings}>
       <AccessContext.Provider value={access}>{children}</AccessContext.Provider>

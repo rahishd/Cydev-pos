@@ -391,3 +391,66 @@ main {
     margin-top: 0;
   }
 }
+
+/* Dark theme: Settings → System → Theme. Tailwind's palette is CSS variables, so remapping the light shades flips every page. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #0f0f12;
+  --color-surface: #18181b;
+  --color-border: #3f3f46;
+  --color-text: #f4f4f5;
+  --color-text-muted: #a1a1aa;
+
+  --color-white: #18181b;
+  --color-zinc-50: #1c1c20;
+  --color-zinc-100: #27272a;
+  --color-zinc-200: #3f3f46;
+  --color-zinc-300: #52525b;
+  --color-zinc-400: #71717a;
+  --color-zinc-500: #a1a1aa;
+  --color-zinc-600: #b4b4bb;
+  --color-zinc-700: #d4d4d8;
+  --color-zinc-800: #e4e4e7;
+  --color-zinc-900: #f4f4f5;
+  --color-gray-50: #1c1c20;
+  --color-gray-100: #27272a;
+  --color-gray-200: #3f3f46;
+  --color-gray-300: #52525b;
+  --color-gray-400: #71717a;
+  --color-gray-500: #a1a1aa;
+  --color-gray-600: #b4b4bb;
+  --color-gray-700: #d4d4d8;
+  --color-gray-800: #e4e4e7;
+  --color-gray-900: #f4f4f5;
+}
+
+:root[data-theme="dark"] body {
+  background: #0f0f12;
+}
+
+:root[data-theme="dark"] .glass-card,
+:root[data-theme="dark"] .glass-container,
+:root[data-theme="dark"] .glass-table {
+  background: rgba(39, 39, 42, 0.7);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .glass-input,
+:root[data-theme="dark"] .glass-select,
+:root[data-theme="dark"] .glass-button {
+  background: rgba(39, 39, 42, 0.8);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+:root[data-theme="dark"] table tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+:root[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme="dark"] .credit-footer {
+  background: #1f1a14;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
