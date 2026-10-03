@@ -5,6 +5,8 @@ import { Topbar } from "@/components/layout/Topbar";
 import { SettingsProvider } from "@/components/providers/SettingsProvider";
 import { getSettings } from "@/lib/settings";
 
+export const maxDuration = 60;
+
 export default async function DashboardLayout({
   children,
 }: {

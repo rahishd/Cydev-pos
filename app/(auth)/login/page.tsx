@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Card } from "@/components/ui/Card";
 
+export const maxDuration = 60;
+
 async function login(formData: FormData) {
   "use server";
   try {
