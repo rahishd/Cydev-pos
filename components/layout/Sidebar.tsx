@@ -2,36 +2,7 @@
 
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-
-type NavItem = {
-  label: string;
-  href: string;
-  enabled: boolean;
-  /** Visible when the user holds any of these permissions (or any permission starting with "prefix."). */
-  anyOf?: string[];
-  prefix?: string;
-  ownerOnly?: boolean;
-};
-
-const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", enabled: true, anyOf: ["dashboard.view"] },
-  { label: "Products", href: "/products", enabled: true, anyOf: ["products.view"] },
-  { label: "Inventory", href: "/inventory", enabled: true, anyOf: ["inventory.view"] },
-  { label: "Purchases", href: "/purchases", enabled: true, anyOf: ["purchases.view"] },
-  {
-    label: "Sales / POS",
-    href: "/sales",
-    enabled: true,
-    anyOf: ["sales.create", "sales.history", "sales.return", "sales.exchange"],
-  },
-  { label: "Customers", href: "/customers", enabled: true, anyOf: ["customers.view"] },
-  { label: "Expenses", href: "/expenses", enabled: true, anyOf: ["expenses.view"] },
-  { label: "Reports", href: "#", enabled: false, prefix: "reports" },
-  { label: "Users", href: "/users", enabled: true, ownerOnly: true },
-  { label: "Audit Log", href: "/audit-log", enabled: true, anyOf: ["audit.view"] },
-  
-  { label: "Settings", href: "/settings", enabled: true, prefix: "settings" },
-];
+import { NAV_ITEMS, canSee } from "@/components/layout/nav-config";
 
 export function Sidebar({
   isOwner,
@@ -44,16 +15,10 @@ export function Sidebar({
   shopName: string;
   logo: string;
 }) {
-  const visible = navItems.filter((item) => {
-    if (isOwner) return true;
-    if (item.ownerOnly) return false;
-    if (item.anyOf) return item.anyOf.some((p) => permissions.includes(p));
-    if (item.prefix) return permissions.some((p) => p.startsWith(item.prefix + "."));
-    return true;
-  });
+  const visible = NAV_ITEMS.filter((item) => canSee(item, isOwner, permissions));
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col glass-container border-r border-r-white/30 rounded-none">
+    <aside className="hidden w-56 shrink-0 lg:flex flex-col glass-container border-r border-r-white/30 rounded-none">
       <div className="flex items-center gap-2.5 px-4 py-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={logo} alt={shopName} className="h-9 w-9 rounded-md object-contain" />

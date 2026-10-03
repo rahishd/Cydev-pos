@@ -15,7 +15,7 @@ async function login(formData: FormData) {
     await signIn("credentials", {
       userId: formData.get("userId"),
       password: formData.get("password"),
-      redirectTo: "/dashboard",
+      redirectTo: "/home",
     });
   } catch (error) {
     if (error instanceof AuthError) {

@@ -32,3 +32,12 @@ export function formatDate(date: Date | string): string {
     year: "numeric",
   });
 }
+
+const NEPAL_OFFSET_MS = (5 * 60 + 45) * 60_000;
+
+/** Midnight (Nepal time) at the start of today, as a UTC instant. Servers run in UTC, so "today" needs this. */
+export function nepalDayStart(daysAgo = 0, from = new Date()): Date {
+  const local = new Date(from.getTime() + NEPAL_OFFSET_MS);
+  const startLocal = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - daysAgo);
+  return new Date(startLocal - NEPAL_OFFSET_MS);
+}

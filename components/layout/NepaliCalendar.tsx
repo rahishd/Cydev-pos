@@ -43,7 +43,7 @@ const sameDay = (a: Date, b: Date) =>
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
 
-export function NepaliCalendar() {
+export function NepaliCalendar({ onColor = false }: { onColor?: boolean }) {
   const [today, setToday] = useState<Date | null>(null);
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<{ y: number; m: number } | null>(null);
@@ -103,14 +103,14 @@ export function NepaliCalendar() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex flex-col items-start rounded-md px-2 py-1 text-left leading-tight hover:bg-zinc-100/60"
+        className={cn("flex flex-col items-start rounded-md px-2 py-1 text-left leading-tight", onColor ? "hover:bg-white/10" : "hover:bg-zinc-100/60")}
         aria-haspopup="dialog"
         aria-expanded={open}
       >
-        <span className="text-sm font-semibold text-text">
+        <span className={cn("text-sm font-semibold", onColor ? "text-white" : "text-text")}>
           {toNp(nt.getDate())} {MONTHS_NP[nt.getMonth()]} {toNp(nt.getYear())}, {DAYS_NP[nt.getDay()]}
         </span>
-        <span className="text-xs text-text-muted">
+        <span className={cn("text-xs", onColor ? "text-white/80" : "text-text-muted")}>
           {MONTHS_EN[nt.getMonth()]} {nt.getDate()}, {nt.getYear()} BS &nbsp;·&nbsp; {adLabel}
         </span>
       </button>
