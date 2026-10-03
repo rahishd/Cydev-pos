@@ -508,3 +508,11 @@ main {
     background: #fff !important;
   }
 }
+
+/* Report rows tinted by outcome (green = refunded, red = not refunded). */
+table tbody tr[data-tone="good"] {
+  background: rgba(22, 163, 74, 0.16) !important;
+}
+table tbody tr[data-tone="bad"] {
+  background: rgba(220, 38, 38, 0.16) !important;
+}

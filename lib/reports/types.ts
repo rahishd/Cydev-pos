@@ -16,6 +16,8 @@ export type ReportTable = {
   cols: Col[];
   rows: Row[];
   totals?: Row;
+  /** Rows carry `_id`; the viewer adds Download / WhatsApp buttons for each. Rows may carry `_tone` to be tinted green or red. */
+  rowActions?: "return";
 };
 
 export type ChartSpec = {

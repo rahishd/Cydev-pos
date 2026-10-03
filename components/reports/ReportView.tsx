@@ -17,6 +17,8 @@ import {
   YAxis,
 } from "recharts";
 import { Card } from "@/components/ui/Card";
+import { useCan } from "@/components/providers/SettingsProvider";
+import { getReturnShareInfo } from "@/app/(dashboard)/sales/return-share-actions";
 import { fmtCard, fmtCell, fmtMoney, isNumericFmt } from "@/lib/reports/format";
 import type { ChartSpec, ReportResult, ReportTable } from "@/lib/reports/types";
 
@@ -82,7 +84,70 @@ function Chart({ spec }: { spec: ChartSpec }) {
   );
 }
 
+function ReturnButtons({ id }: { id: string }) {
+  const [busy, setBusy] = useState<"" | "dl" | "wa">("");
+
+  const download = async () => {
+    setBusy("dl");
+    try {
+      const info = await getReturnShareInfo(id);
+      const a = document.createElement("a");
+      a.href = info.downloadUrl;
+      a.download = `${info.returnNo}.pdf`;
+      a.click();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not prepare the receipt");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const whatsapp = async () => {
+    setBusy("wa");
+    try {
+      const info = await getReturnShareInfo(id);
+      const { normalizeWhatsAppNumber } = await import("@/lib/invoice-pdf");
+      let phone = info.phone;
+      if (normalizeWhatsAppNumber(phone).length < 11) {
+        phone = window.prompt("Customer's WhatsApp number (for example 98XXXXXXXX)", phone) ?? "";
+        if (normalizeWhatsAppNumber(phone).length < 11) return;
+      }
+      const { money } = await import("@/lib/return-pdf");
+      const isReturn = info.type === "RETURN";
+      const text = [
+        `Hello${info.customerName ? " " + info.customerName : ""},`,
+        "",
+        `*${isReturn ? "Return" : "Exchange"} receipt ${info.returnNo}*`,
+        `Original invoice: ${info.invoiceNo}`,
+        isReturn ? `Amount: ${money(info.amount)}` : `Value of goods returned: ${money(info.amount)}`,
+        `Refund status: *${info.refunded ? (info.refundMethod === "STORE_CREDIT" ? "CREDIT ISSUED" : "REFUNDED") : "NO REFUND"}*`,
+        "",
+        "Tap the link below to view or download your receipt (PDF):",
+        info.url,
+      ].join("\n");
+      window.location.href = `whatsapp://send?phone=${normalizeWhatsAppNumber(phone)}&text=${encodeURIComponent(text)}`;
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not prepare the receipt");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  return (
+    <div className="flex gap-1.5">
+      <button onClick={download} disabled={busy !== ""} className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-zinc-100 disabled:opacity-50">
+        {busy === "dl" ? "..." : "Download"}
+      </button>
+      <button onClick={whatsapp} disabled={busy !== ""} className="rounded-md border border-border px-2 py-1 text-xs font-medium text-success hover:bg-zinc-100 disabled:opacity-50">
+        {busy === "wa" ? "..." : "WhatsApp"}
+      </button>
+    </div>
+  );
+}
+
 function Table({ t }: { t: ReportTable }) {
+  const can = useCan();
+  const actions = t.rowActions === "return" && can("sales.share");
   return (
     <Card className="p-0">
       {t.title && <div className="border-b border-border px-4 py-3 text-sm font-semibold text-text">{t.title}</div>}
@@ -94,23 +159,25 @@ function Table({ t }: { t: ReportTable }) {
                 {c.label}
               </th>
             ))}
+            {actions && <th className="px-4 py-2.5 font-medium">Receipt</th>}
           </tr>
         </thead>
         <tbody>
           {t.rows.length === 0 ? (
             <tr>
-              <td colSpan={t.cols.length} className="px-4 py-8 text-center text-text-muted">
+              <td colSpan={t.cols.length + (actions ? 1 : 0)} className="px-4 py-8 text-center text-text-muted">
                 Nothing to show for this period.
               </td>
             </tr>
           ) : (
             t.rows.map((row, i) => (
-              <tr key={i} className="border-b border-border/60 last:border-0">
+              <tr key={i} data-tone={row._tone ?? undefined} className="border-b border-border/60 last:border-0">
                 {t.cols.map((c) => (
-                  <td key={c.key} className={`px-4 py-2 ${isNumericFmt(c.fmt) ? "whitespace-nowrap text-right tabular-nums" : ""}`}>
+                  <td key={c.key} className={`px-4 py-2 ${isNumericFmt(c.fmt) ? "whitespace-nowrap text-right tabular-nums" : ""} ${c.key === "status" && row._tone ? (row._tone === "good" ? "font-semibold text-success" : "font-semibold text-danger") : ""}`}>
                     {fmtCell(row[c.key], c.fmt)}
                   </td>
                 ))}
+                {actions && <td className="px-4 py-2">{row._id ? <ReturnButtons id={String(row._id)} /> : null}</td>}
               </tr>
             ))
           )}

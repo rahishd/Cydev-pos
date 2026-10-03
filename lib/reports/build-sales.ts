@@ -206,14 +206,16 @@ export async function profitSummary(f: Filters, ctx: Ctx): Promise<Body> {
   const t = totalsOf(lines);
   const refunds = sumBy(returns.filter((r) => r.type === "RETURN"), (r) => r.amount);
   const net = t.gross - t.discounts - refunds;
-  const gp = net - t.cost;
+  // Goods that came back into stock are no longer a cost of sales.
+  const cogs = t.cost - sumBy(returns.filter((r) => r.type === "RETURN"), (r) => r.cost);
+  const gp = net - cogs;
   const exp = sumBy(expenses, (e) => e.amount);
   const showNet = ctx.can("reports.net_profit");
   const np = gp - exp;
 
   const cards: Card[] = [
     { label: "Net Sales", value: round2(net), fmt: "money" },
-    { label: "Cost of Goods Sold", value: round2(t.cost), fmt: "money" },
+    { label: "Cost of Goods Sold", value: round2(cogs), fmt: "money" },
     { label: "Gross Profit", value: round2(gp), fmt: "money", tone: gp >= 0 ? "good" : "bad" },
     { label: "Gross Margin", value: pct(gp, net), fmt: "pct" },
   ];
@@ -230,7 +232,7 @@ export async function profitSummary(f: Filters, ctx: Ctx): Promise<Body> {
     { item: "less Discounts", amount: -round2(t.discounts) },
     { item: "less Returns", amount: -round2(refunds) },
     { item: "Net sales", amount: round2(net) },
-    { item: "less Cost of goods sold", amount: -round2(t.cost) },
+    { item: "less Cost of goods sold", amount: -round2(cogs) },
     { item: "Gross profit", amount: round2(gp) },
   ];
   if (showNet) {
@@ -241,7 +243,7 @@ export async function profitSummary(f: Filters, ctx: Ctx): Promise<Body> {
     cards,
     notes: [
       "Cost of goods sold uses the actual purchase cost recorded on each sale, not today's price.",
-      "Returns are deducted at the refund amount recorded on the Returns screen; the cost of returned goods is not added back.",
+      "Returns are deducted at the amount refunded to the customer, and the cost of goods that went back into stock is taken off the cost of goods sold."
     ],
     tables: [{ title: "How profit is worked out", cols: [text("item", "Line"), money("amount", "Amount")], rows: flow }],
   };
@@ -397,6 +399,9 @@ export async function returnsReport(f: Filters, _ctx: Ctx): Promise<Body> {
   }
   const reasonRows: Row[] = [...byReason.entries()].sort((a, b) => b[1].n - a[1].n).map(([reason, e]) => ({ reason, n: e.n, qty: e.qty, amount: round2(e.amount) }));
   const rows: Row[] = returns.map((r) => ({
+    _id: r.id,
+    _tone: r.refunded ? "good" : "bad",
+    status: r.refunded ? (r.storeCredit ? "Credit issued" : "Refunded") : "Not refunded",
     date: r.at.toISOString(),
     invoice: r.invoiceNo,
     type: r.type === "RETURN" ? "Return" : "Exchange",
@@ -419,7 +424,7 @@ export async function returnsReport(f: Filters, _ctx: Ctx): Promise<Body> {
     notes: ["Returns aren't linked to a product, so they can't be split by product or category. Use the date, staff and customer filters instead."],
     tables: [
       { title: "By reason", cols: [text("reason", "Reason"), int("n", "Returns"), int("qty", "Quantity"), money("amount", "Value")], rows: reasonRows },
-      { title: "All returns & exchanges", cols: [{ key: "date", label: "Date", fmt: "date" }, text("invoice", "Invoice"), text("type", "Type"), text("customer", "Customer"), text("staff", "Sold By"), int("qty", "Qty"), text("reason", "Reason"), money("amount", "Value"), text("refundedAs", "Refunded As")], rows },
+      { title: "All returns & exchanges", rowActions: "return" as const, cols: [text("status", "Refund"), { key: "date", label: "Date", fmt: "date" }, text("invoice", "Invoice"), text("type", "Type"), text("customer", "Customer"), text("staff", "Sold By"), int("qty", "Qty"), text("reason", "Reason"), money("amount", "Value"), text("refundedAs", "Refunded As")], rows },
     ],
   };
 }

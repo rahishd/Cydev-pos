@@ -40,7 +40,7 @@ const methodLabel = (m: string) =>
 const fmtDate = (d: Date | string) =>
   new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 
-function letterhead(doc: jsPDF, title: string, meta: [string, string][]): number {
+export function letterhead(doc: jsPDF, title: string, meta: [string, string][]): number {
   const y = 20;
   const LOGO = 30;
   const logo = shopLogo();
@@ -86,7 +86,7 @@ function letterhead(doc: jsPDF, title: string, meta: [string, string][]): number
   return bottom + 8;
 }
 
-function footer(doc: jsPDF) {
+export function pdfFooter(doc: jsPDF) {
   const pages = doc.getNumberOfPages();
   for (let p = 1; p <= pages; p++) {
     doc.setPage(p);
@@ -141,7 +141,7 @@ export function buildExpenseVoucherPdf(e: ExpenseRow): jsPDF {
   doc.setFont("helvetica", "bold").setFontSize(18).setTextColor(...ACCENT);
   doc.text(money(e.amount), R - 6, y + 14, { align: "right" });
 
-  footer(doc);
+  pdfFooter(doc);
   return doc;
 }
 
@@ -261,7 +261,7 @@ export function buildExpenseReportPdf(data: ExpenseReportData): jsPDF {
     }
   }
 
-  footer(doc);
+  pdfFooter(doc);
   return doc;
 }
 

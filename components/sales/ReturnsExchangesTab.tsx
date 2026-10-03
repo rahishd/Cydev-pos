@@ -19,6 +19,7 @@ export function ReturnsExchangesTab() {
   const [showFindInvoice, setShowFindInvoice] = useState(false);
   const [showProcessReturn, setShowProcessReturn] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   // Return form
   const [returnType, setReturnType] = useState<"RETURN" | "EXCHANGE">("RETURN");
@@ -58,11 +59,13 @@ export function ReturnsExchangesTab() {
   };
 
   const handleProcessReturn = async () => {
+    if (processing) return;
     if (!selectedItem || quantity <= 0 || !reason) {
       alert("Please select item, quantity, and reason");
       return;
     }
 
+    setProcessing(true);
     try {
       await processSaleReturn(
         selectedSale.sale.id,
@@ -86,6 +89,8 @@ export function ReturnsExchangesTab() {
     } catch (err) {
       console.error("Failed to process return:", err);
       alert(err instanceof Error ? err.message : "Failed to process return");
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -207,15 +212,17 @@ export function ReturnsExchangesTab() {
                 onChange={(e) => {
                   const item = selectedSale.sale.items.find((i: any) => i.id === e.target.value);
                   setSelectedItem(item);
-                  setQuantity(Math.min(1, item?.quantity || 1));
+                  setQuantity(1);
                 }}
               >
                 <option value="">Select item</option>
                 {selectedSale.sale.items.map((item: any) => (
-                  <option key={item.id} value={item.id}>
+                  <option key={item.id} value={item.id} disabled={item.quantity - item.returnedQty <= 0}>
                     {item.productVariant.product.name}
                     {item.productVariant.size && ` / ${item.productVariant.size}`}
-                    {item.productVariant.color && ` / ${item.productVariant.color}`} - Qty: {item.quantity}
+                    {item.productVariant.color && ` / ${item.productVariant.color}`} - Bought: {item.quantity}
+                    {item.returnedQty > 0 ? `, already returned: ${item.returnedQty}` : ""}
+                    {item.quantity - item.returnedQty <= 0 ? " (fully returned)" : ""}
                   </option>
                 ))}
               </Select>
@@ -225,14 +232,14 @@ export function ReturnsExchangesTab() {
             {selectedItem && (
               <div>
                 <label className="block text-sm font-medium text-text mb-2">
-                  Quantity to Return * (Max: {selectedItem.quantity})
+                  Quantity to Return * (Max: {selectedItem.quantity - selectedItem.returnedQty})
                 </label>
                 <Input
                   type="number"
                   min="1"
-                  max={selectedItem.quantity}
+                  max={selectedItem.quantity - selectedItem.returnedQty}
                   value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                  onChange={(e) => setQuantity(Math.min(selectedItem.quantity - selectedItem.returnedQty, Math.max(1, parseInt(e.target.value) || 1)))}
                   className="text-sm"
                 />
               </div>
@@ -324,7 +331,7 @@ export function ReturnsExchangesTab() {
                   <div className="border-t border-blue-200 pt-1 flex justify-between font-semibold">
                     <span>Amount</span>
                     <span>
-                      NPR {formatCurrency(Number(selectedItem.unitPrice) * quantity)}
+                      NPR {formatCurrency(Number(selectedItem.refundPerUnit) * quantity)}
                     </span>
                   </div>
                 </div>
@@ -343,8 +350,8 @@ export function ReturnsExchangesTab() {
               >
                 Cancel
               </Button>
-              <Button onClick={handleProcessReturn} disabled={!selectedItem} className="flex-1">
-                Process {returnType}
+              <Button onClick={handleProcessReturn} disabled={!selectedItem || processing} className="flex-1">
+                {processing ? "Processing..." : `Process ${returnType}`}
               </Button>
             </div>
           </div>

@@ -465,6 +465,31 @@ export async function getSalesHistory(search?: string, customerId?: string, paym
   }));
 }
 
+/** Units already sent back for each line of a sale. Returns saved before lines were tracked count against the only line of a one-item sale. */
+function returnedByItem(items: Array<{ id: string }>, returns: Array<{ saleItemId: string | null; quantity: number }>) {
+  const map = new Map<string, number>();
+  for (const r of returns) {
+    const id = r.saleItemId ?? (items.length === 1 ? items[0].id : null);
+    if (id) map.set(id, (map.get(id) ?? 0) + r.quantity);
+  }
+  return map;
+}
+
+/** What the customer actually paid for these units: the line's price after its own discount, less its share of any whole-bill discount, plus its share of tax. */
+function refundFor(
+  sale: { discount: unknown; total: unknown },
+  items: Array<{ total: unknown }>,
+  item: { total: unknown; quantity: number },
+  qty: number
+) {
+  const itemsTotal = items.reduce((sum, i) => sum + Number(i.total), 0);
+  const billDiscount = Number(sale.discount);
+  const share = itemsTotal > 0 ? Number(item.total) / itemsTotal : 0;
+  const paid = Number(item.total) - billDiscount * share;
+  const taxFactor = itemsTotal - billDiscount > 0 ? Number(sale.total) / (itemsTotal - billDiscount) : 1;
+  return Math.round(((paid * taxFactor) / item.quantity) * qty * 100) / 100;
+}
+
 export async function getSaleDetails(saleId: string) {
   const access = await assertPermission("sales.history");
   const sale = await prisma.sale.findUnique({
@@ -512,12 +537,15 @@ export async function getSaleDetails(saleId: string) {
           quantity: true,
           reason: true,
           refundAmount: true,
+          saleItemId: true,
         },
       },
     },
   });
 
   if (!sale) throw new Error("Sale not found");
+
+  const returned = returnedByItem(sale.items, sale.returns);
 
   // Calculate profit
   const profit = sale.items.reduce(
@@ -539,9 +567,11 @@ export async function getSaleDetails(saleId: string) {
         discount: Number(item.discount),
         total: Number(item.total),
         unitCost: Number(item.unitCost),
+        returnedQty: returned.get(item.id) ?? 0,
+        refundPerUnit: refundFor(sale, sale.items, item, 1),
       })),
       payments: sale.payments,
-      returns: sale.returns,
+      returns: sale.returns.map((r) => ({ ...r, refundAmount: Number(r.refundAmount) })),
     },
     outstanding: Number(sale.total) - Number(sale.amountPaid),
     profit: access.can("reports.gross_profit") ? profit : undefined,
@@ -567,7 +597,9 @@ export async function processSaleReturn(
     select: {
       invoiceNo: true,
       createdAt: true,
-      items: { select: { id: true, productVariantId: true, unitPrice: true, quantity: true, unitCost: true } },
+      discount: true,
+      total: true,
+      items: { select: { id: true, productVariantId: true, unitPrice: true, quantity: true, unitCost: true, total: true } },
     },
   });
 
@@ -582,24 +614,51 @@ export async function processSaleReturn(
   }
 
   const saleItem = sale.items.find((i) => i.id === itemId);
-  if (!saleItem || quantity > saleItem.quantity) {
-    throw new Error("Invalid return quantity");
+  if (!saleItem) throw new Error("That item isn't on this invoice.");
+  if (!Number.isInteger(quantity) || quantity < 1) throw new Error("Enter a quantity of at least 1.");
+
+  const refundAmount = refundFor(sale, sale.items, saleItem, quantity);
+  const refunded = type === "RETURN" || (priceDifference ?? 0) < 0;
+
+  // The check and the save happen together, so two clicks at once can't return the same units twice.
+  let returnRecord: { id: string };
+  try {
+    returnRecord = await prisma.$transaction(
+      async (tx) => {
+        const earlier = await tx.saleReturn.findMany({ where: { saleId }, select: { saleItemId: true, quantity: true } });
+        const already = returnedByItem(sale.items, earlier).get(saleItem.id) ?? 0;
+        const left = saleItem.quantity - already;
+        if (quantity > left) {
+          throw new Error(
+            left <= 0
+              ? `All ${saleItem.quantity} of this item on ${sale.invoiceNo} have already been returned.`
+              : `Only ${left} of this item can still be returned on ${sale.invoiceNo} (${already} already returned).`
+          );
+        }
+        return tx.saleReturn.create({
+          data: {
+            saleId,
+            saleItemId: saleItem.id,
+            type,
+            quantity,
+            reason,
+            refundAmount: new Decimal(Math.abs(refundAmount)),
+            returnedCost: new Decimal(returnRules.autoRestock ? Number(saleItem.unitCost) * quantity : 0),
+            storeCredit: refundMethod === "STORE_CREDIT",
+            refunded,
+            refundMethod,
+            newVariantId: type === "EXCHANGE" ? newVariantId || null : null,
+            priceDifference: type === "EXCHANGE" && priceDifference !== undefined ? new Decimal(priceDifference) : null,
+          },
+          select: { id: true },
+        });
+      },
+      { isolationLevel: "Serializable" }
+    );
+  } catch (e) {
+    if ((e as { code?: string }).code === "P2034") throw new Error("Another return was being saved at the same moment. Please check the invoice and try again.");
+    throw e;
   }
-
-  const refundAmount = Number(saleItem.unitPrice) * quantity - (Number(saleItem.unitCost) * quantity);
-
-  // Create return record
-  const returnRecord = await prisma.saleReturn.create({
-    data: {
-      saleId,
-      type,
-      quantity,
-      reason,
-      refundAmount: new Decimal(Math.abs(refundAmount)),
-      storeCredit: refundMethod === "STORE_CREDIT",
-    },
-    select: { id: true },
-  });
 
   // Restore inventory for returned item (unless the shop wants returns checked before restocking)
   if (returnRules.autoRestock) {

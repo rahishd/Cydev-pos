@@ -35,3 +35,6 @@ const reportPayload = (f: ExpenseReportFilters) =>
 export const expenseReportToken = (f: ExpenseReportFilters) => sign(reportPayload(f));
 export const verifyExpenseReportToken = (f: ExpenseReportFilters, token: string) =>
   verify(reportPayload(f), token);
+
+export const returnToken = (id: string) => sign(`return:${id}`);
+export const verifyReturnToken = (id: string, token: string) => verify(`return:${id}`, token);

@@ -466,7 +466,7 @@ export async function overview(f: Filters, ctx: Ctx): Promise<Body> {
     const t = totalsOf(sold.lines);
     const refunds = sumBy(returns.filter((r) => r.type === "RETURN"), (r) => r.amount);
     const net = t.gross - t.discounts - refunds;
-    const gp = net - t.cost;
+    const gp = net - (t.cost - sumBy(returns.filter((r) => r.type === "RETURN"), (r) => r.cost));
     const exp = sumBy(expenses, (e) => e.amount);
     if (ctx.can("reports.sales")) cards.push({ label: "Total Sales", value: round2(net), fmt: "money", hint: "Net of discounts and returns" });
     if (ctx.can("reports.gross_profit")) cards.push({ label: "Gross Profit", value: round2(gp), fmt: "money", tone: gp >= 0 ? "good" : "bad" });
