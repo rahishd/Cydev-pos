@@ -34,6 +34,18 @@ export async function GET() {
     await check("audit log table", () => prisma.auditLog.findFirst({ select: { auditNo: true } })),
   ];
 
+  // Names only, never values: shows which related variables this deployment can actually see.
+  const seenNames = Object.keys(process.env)
+    .filter((k) => /^(DATABASE|POSTGRES|NEON|PG|AUTH|NEXTAUTH|NEXT_PUBLIC|BLOB|PRISMA)/i.test(k))
+    .sort();
+  const deployment = {
+    environment: process.env.VERCEL_ENV ?? "not on Vercel",
+    commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
+    region: process.env.VERCEL_REGION ?? null,
+    databaseUrlLooksValid: /^postgres(ql)?:\/\//.test(process.env.DATABASE_URL ?? ""),
+    seenNames,
+  };
+
   const ok = env.DATABASE_URL && env.AUTH_SECRET && checks.every((c) => c.ok);
-  return NextResponse.json({ ok, env, checks }, { status: ok ? 200 : 500 });
+  return NextResponse.json({ ok, env, deployment, checks }, { status: ok ? 200 : 500 });
 }
